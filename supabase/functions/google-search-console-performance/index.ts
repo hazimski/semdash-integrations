@@ -73,9 +73,18 @@ serve(async (req) => {
       }
     )
 
+    console.log('GSC API Response Status:', performanceResponse.status)
+    console.log('GSC API Response Headers:', Object.fromEntries(performanceResponse.headers.entries()))
+
     if (!performanceResponse.ok) {
       const errorData = await performanceResponse.json()
       console.error('Google API error response:', errorData)
+      console.error('Full error details:', {
+        status: performanceResponse.status,
+        statusText: performanceResponse.statusText,
+        headers: Object.fromEntries(performanceResponse.headers.entries()),
+        error: errorData
+      })
       
       if (performanceResponse.status === 401) {
         throw new Error('Google access token expired')
@@ -86,6 +95,7 @@ serve(async (req) => {
 
     const performance = await performanceResponse.json()
     
+    console.log('Raw GSC API Response:', JSON.stringify(performance, null, 2))
     console.log(`Retrieved ${performance.rows?.length || 0} rows of data`)
     
     // Transform the data to match Google Search Console format exactly
@@ -97,12 +107,15 @@ serve(async (req) => {
       position: parseFloat(row.position.toFixed(1))
     })) || []
 
+    console.log('Transformed data sample:', transformedData.slice(0, 2))
+
     return new Response(
       JSON.stringify(transformedData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error in google-search-console-performance function:', error)
+    console.error('Full error stack:', error.stack)
     return new Response(
       JSON.stringify({ error: error.message || 'Failed to fetch data from Google Search Console' }),
       { 
