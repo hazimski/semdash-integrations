@@ -14,7 +14,8 @@ export function GoogleSearchConsole() {
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: scope,
-      access_type: 'offline'
+      access_type: 'offline',
+      prompt: 'consent'
     });
 
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

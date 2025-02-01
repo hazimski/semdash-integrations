@@ -30,6 +30,11 @@ serve(async (req) => {
     })
 
     const tokens = await tokenResponse.json()
+    
+    if (tokens.error) {
+      console.error('Token exchange error:', tokens)
+      throw new Error(tokens.error_description || 'Failed to exchange code for tokens')
+    }
 
     // Store tokens in user_settings
     const supabase = createClient(
@@ -53,6 +58,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error('Auth error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
