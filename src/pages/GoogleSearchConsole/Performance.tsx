@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Download, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../config/supabase';
 
 interface PerformanceData {
   key: string;
