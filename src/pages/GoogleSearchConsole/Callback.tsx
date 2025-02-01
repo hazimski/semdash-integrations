@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../integrations/supabase/client';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -25,20 +24,40 @@ export function GoogleSearchConsoleCallback() {
       }
 
       try {
-        console.log('Calling google-search-console-auth with code');
-        const { data, error } = await supabase.functions.invoke('google-search-console-auth', {
-          body: { 
-            code,
-            redirect_uri: `${window.location.origin}/google-search-console/callback`
-          },
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
           headers: {
-            Authorization: `Bearer ${user.id}`
-          }
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            code,
+            client_id: '1012072796878-ufqj8s88vto2tnp0vj3g7vv9qk7n8l1q.apps.googleusercontent.com',
+            client_secret: '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',
+            redirect_uri: `${window.location.origin}/google-search-console/callback`,
+            grant_type: 'authorization_code',
+          }),
         });
 
-        if (error) throw error;
+        const tokens = await response.json();
+        
+        if (tokens.error) {
+          console.error('Token exchange error:', tokens);
+          throw new Error(tokens.error_description || 'Failed to exchange code for tokens');
+        }
 
-        console.log('Auth successful:', data);
+        // Store tokens in user_settings
+        const { error: updateError } = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: user.id,
+            google_access_token: tokens.access_token,
+            google_refresh_token: tokens.refresh_token,
+            google_token_expiry: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (updateError) throw updateError;
+
         toast.success('Successfully connected to Google Search Console');
         navigate('/google-search-console/domains');
       } catch (error) {
