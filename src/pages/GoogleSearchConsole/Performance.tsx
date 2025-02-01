@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../integrations/supabase/client';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { toast } from 'react-hot-toast';
-import { Search, Download, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
+import { format } from 'date-fns';
+import { Download } from 'lucide-react';
+import { saveAs } from 'file-saver';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
-import { formatNumber } from '../../utils/format';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../config/supabase';
 
 export function GoogleSearchConsolePerformance() {
-  const { domain } = useParams<{ domain: string }>();
-  const [dateRange, setDateRange] = useState('28');
-  const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentPagesPage, setCurrentPagesPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
+  const [searchParams] = useSearchParams();
+  const [dateRange, setDateRange] = useState('last28days');
+  const [activeDimension, setActiveDimension] = useState('query');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const { user } = useAuth();
-  const navigate = useNavigate();
 
-  // Query for available domains
   const { data: domains } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
@@ -37,184 +32,169 @@ export function GoogleSearchConsolePerformance() {
     enabled: !!user?.id
   });
 
-  // Default location and language parameters
   const currentParams = {
-    location: '2840', // US
-    language: 'en'  // English
+    domain: searchParams.get('domain') || '',
+    startDate: searchParams.get('startDate') || format(new Date(), 'yyyy-MM-dd'),
+    endDate: searchParams.get('endDate') || format(new Date(), 'yyyy-MM-dd'),
+    dimension: searchParams.get('dimension') || 'query'
   };
 
-  const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
-    queryKey: ['gsc-performance-time', domain, dateRange],
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['gsc-performance', currentParams],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
-      
+
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
-        body: { 
-          siteUrl: decodeURIComponent(domain || ''),
-          days: parseInt(dateRange),
-          dimension: 'date'
+        body: {
+          siteUrl: currentParams.domain,
+          startDate: currentParams.startDate,
+          endDate: currentParams.endDate,
+          dimensions: [currentParams.dimension]
         },
         headers: {
           'x-user-id': user.id
         }
       });
-      
+
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id && !!domain
+    enabled: !!currentParams.domain && !!user?.id
   });
 
-  const { data: dimensionData, isLoading: dimensionLoading } = useQuery({
-    queryKey: ['gsc-performance-dimension', domain, dateRange, activeDimension],
-    queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      
-      const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
-        body: { 
-          siteUrl: decodeURIComponent(domain || ''),
-          days: parseInt(dateRange),
-          dimension: activeDimension
-        },
-        headers: {
-          'x-user-id': user.id
-        }
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id && !!domain
-  });
-
-  const isLoading = timeSeriesLoading || dimensionLoading;
-  const totalItems = dimensionData?.length || 0;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  
-  const getCurrentPage = () => {
-    return activeDimension === 'page' ? currentPagesPage : currentPage;
-  };
-
-  const startIndex = (getCurrentPage() - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentData = dimensionData?.slice(startIndex, endIndex) || [];
+  const totalPages = Math.ceil((data?.rows?.length || 0) / 100);
+  const currentPage = parseInt(searchParams.get('page') || '1');
+  const start = (currentPage - 1) * 100;
+  const end = start + 100;
+  const currentData = data?.rows?.slice(start, end) || [];
 
   const handleExport = () => {
-    if (!dimensionData?.length) return;
+    if (!data?.rows) return;
 
-    const dataToExport = selectedQueries.size > 0 
-      ? dimensionData.filter(item => selectedQueries.has(item.key))
-      : dimensionData;
+    const headers = ['Query', 'Clicks', 'Impressions', 'CTR', 'Position'];
+    const csvData = data.rows.map(item => [
+      item.keys[0],
+      item.clicks,
+      item.impressions,
+      `${(item.ctr * 100).toFixed(2)}%`,
+      item.position.toFixed(2)
+    ]);
 
-    const headers = [
-      activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance',
-      'Clicks',
-      'Impressions',
-      'CTR',
-      'Position'
-    ];
-
-    const csvData = [
+    const csvContent = [
       headers.join(','),
-      ...dataToExport.map(item => [
-        item.key,
-        item.clicks,
-        item.impressions,
-        item.ctr,
-        item.position.toFixed(1)
-      ].join(','))
+      ...csvData.map(row => row.join(','))
     ].join('\n');
 
-    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `gsc_${activeDimension}_${domain}_${dateRange}days.csv`);
-    toast.success('CSV file exported successfully');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `gsc-performance-${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
-  const handleDomainChange = (newDomain: string) => {
-    navigate(`/google-search-console/performance/${encodeURIComponent(newDomain)}`);
+  const handleDomainChange = (domain: string) => {
+    // Handle domain change logic here
   };
 
   const handleSelectAll = () => {
-    if (dimensionData) {
-      if (selectedQueries.size === dimensionData.length) {
-        setSelectedQueries(new Set());
-      } else {
-        setSelectedQueries(new Set(dimensionData.map(item => item.key)));
-      }
-    }
-  };
-
-  const handleSelectQuery = (key: string) => {
-    const newSelectedQueries = new Set(selectedQueries);
-    if (selectedQueries.has(key)) {
-      newSelectedQueries.delete(key);
+    if (selectedRows.size === currentData.length) {
+      setSelectedRows(new Set());
     } else {
-      newSelectedQueries.add(key);
+      setSelectedRows(new Set(currentData.map(item => item.keys[0])));
     }
-    setSelectedQueries(newSelectedQueries);
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (activeDimension === 'page') {
-      setCurrentPagesPage(newPage);
+  const handleSelectQuery = (query: string) => {
+    const newSelected = new Set(selectedRows);
+    if (newSelected.has(query)) {
+      newSelected.delete(query);
     } else {
-      setCurrentPage(newPage);
+      newSelected.add(query);
     }
+    setSelectedRows(newSelected);
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const date = new Date(label);
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-          <p className="font-semibold mb-1">
-            {date.toLocaleDateString('default', { month: 'long', year: 'numeric' })}
-          </p>
-          <p className="text-sm text-gray-600">
-            Search Volume: <span className="font-medium text-gray-900">{formatNumber(payload[0].value)}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
+  const handlePageChange = (page: number) => {
+    // Handle page change logic here
   };
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={timeSeriesData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
-          dataKey="date"
-          tickFormatter={(value) => {
-            const date = new Date(value);
-            return date.toLocaleDateString('default', { 
-              month: 'short',
-              day: 'numeric'
-            });
-          }}
-          tick={{ fontSize: 12, fill: '#6B7280' }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis yAxisId="left" />
-        <YAxis yAxisId="right" orientation="right" />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend />
-        <Line
-          yAxisId="left"
-          type="monotone"
-          dataKey="clicks"
-          stroke="#2563eb"
-          name="Clicks"
-        />
-        <Line
-          yAxisId="right"
-          type="monotone"
-          dataKey="impressions"
-          stroke="#10b981"
-          name="Impressions"
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Search Console Performance</h1>
+      
+      {error ? (
+        <div className="bg-red-50 p-4 rounded-lg text-red-700">
+          {error instanceof Error ? error.message : 'Failed to load performance data'}
+        </div>
+      ) : isLoading ? (
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+          <div className="space-y-3">
+            {[...Array(10)].map((_, index) => (
+              <div key={index} className="h-4 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold">
+                Results ({data?.rows?.length || 0})
+              </h2>
+            </div>
+            <button
+              onClick={handleExport}
+              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Query
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Clicks
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Impressions
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CTR
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Position
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentData.map((row, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.keys[0]}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.clicks}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.impressions}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(row.ctr * 100).toFixed(2)}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.position.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
