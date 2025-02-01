@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
 
+const ITEMS_PER_PAGE = 100;
+
 export function GoogleSearchConsolePerformance() {
+  const { domain } = useParams<{ domain: string }>();
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState('28');
   const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
@@ -152,6 +155,33 @@ export function GoogleSearchConsolePerformance() {
           >
             Last 3 months
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
+          <p className="text-3xl font-bold">
+            {calculateTotal(timeSeriesData?.rows, 'clicks').toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
+          <p className="text-3xl font-bold">
+            {calculateTotal(timeSeriesData?.rows, 'impressions').toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
+          <p className="text-3xl font-bold">
+            {calculateAverage(timeSeriesData?.rows, 'ctr').toFixed(2)}%
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Average Position</h3>
+          <p className="text-3xl font-bold">
+            {calculateAverage(timeSeriesData?.rows, 'position').toFixed(1)}
+          </p>
         </div>
       </div>
 
