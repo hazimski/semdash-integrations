@@ -1,41 +1,30 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-hot-toast';
-
-interface Domain {
-  siteUrl: string;
-  permissionLevel: string;
-}
+import { useNavigate } from 'react-router-dom';
 
 export function GoogleSearchConsoleDomains() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const { data: domains, isLoading, error, refetch } = useQuery({
+  
+  const { data: domains, isLoading, error } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
       const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
         headers: {
-          'x-user-id': user.id
+          'x-user-id': (await supabase.auth.getUser()).data.user?.id || ''
         }
       });
       
       if (error) throw error;
-      return data as Domain[];
+      return data;
     },
-    enabled: !!user?.id
+    retry: false
   });
 
   const handleConnect = async () => {
     try {
-      const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       const redirectUri = `${window.location.origin}/google-search-console/callback`;
       const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
       
@@ -52,6 +41,26 @@ export function GoogleSearchConsoleDomains() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Show reconnect button for expired token
+  if (error?.message?.includes('Google access token has expired')) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-lg mx-auto text-center">
+          <h2 className="text-xl font-semibold mb-4">Google Search Console Connection Expired</h2>
+          <p className="text-gray-600 mb-6">
+            Your connection to Google Search Console has expired. Please reconnect to continue accessing your data.
+          </p>
+          <button
+            onClick={handleConnect}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Reconnect to Google Search Console
+          </button>
+        </div>
       </div>
     );
   }
@@ -94,7 +103,7 @@ export function GoogleSearchConsoleDomains() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {domains?.map((domain) => (
+            {domains?.map((domain: any) => (
               <tr key={domain.siteUrl} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {domain.siteUrl}
