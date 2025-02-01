@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Download, ChevronRight, ChevronLeft } from 'lucide-react';
+import { supabase } from '../../config/supabase';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../../hooks/useAuth';
+import { ChevronLeft, ChevronRight, Download, ListPlus } from 'lucide-react';
+import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
-import { KeywordListActions } from '../../components/keywords/KeywordListActions';
-import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../config/supabase';
 
 interface PerformanceData {
   key: string;
@@ -25,6 +26,12 @@ export function GoogleSearchConsolePerformance() {
   const [itemsPerPage] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
+
+  // Default location and language parameters
+  const currentParams = {
+    location: '2840', // US
+    language: 'en'  // English
+  };
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
     queryKey: ['gsc-performance-time', domain, dateRange],
@@ -204,18 +211,16 @@ export function GoogleSearchConsolePerformance() {
               <KeywordListActions
                 selectedKeywords={selectedQueries}
                 onClearSelection={() => setSelectedQueries(new Set())}
-                locationName="2840" // Default location
-                languageName="en" // Default language
-                keywords={dimensionData
-                  ?.filter(item => selectedQueries.has(item.key))
-                  .map(item => ({
-                    keyword: item.key,
-                    searchVolume: item.impressions,
-                    cpc: '-',
-                    keywordDifficulty: '-',
-                    intent: 'informational',
-                    source: 'GSC'
-                  }))}
+                locationName={currentParams.location}
+                languageName={currentParams.language}
+                keywords={dimensionData?.filter(item => selectedQueries.has(item.key)).map(item => ({
+                  keyword: item.key,
+                  searchVolume: item.impressions,
+                  cpc: 0,
+                  keywordDifficulty: 0,
+                  intent: 'informational',
+                  source: 'GSC'
+                }))}
               />
             )}
 
