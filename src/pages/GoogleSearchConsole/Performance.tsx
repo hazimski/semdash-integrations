@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../../hooks/useAuth';
 
 interface PerformanceData {
   clicks: number;
@@ -15,19 +16,29 @@ interface PerformanceData {
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
   const [dateRange, setDateRange] = useState('28');
+  const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['gsc-performance', domain, dateRange],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
         body: { 
           siteUrl: decodeURIComponent(domain || ''),
           days: parseInt(dateRange)
+        },
+        headers: {
+          'x-user-id': user.id
         }
       });
+      
       if (error) throw error;
       return data as PerformanceData[];
-    }
+    },
+    enabled: !!user?.id && !!domain
   });
 
   return (
