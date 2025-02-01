@@ -1,8 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../config/supabase';
+import { supabase } from '../../integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-hot-toast';
 
 interface Domain {
   siteUrl: string;
@@ -13,7 +14,7 @@ export function GoogleSearchConsoleDomains() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { data: domains, isLoading, error } = useQuery({
+  const { data: domains, isLoading, error, refetch } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
       if (!user?.id) {
@@ -31,6 +32,21 @@ export function GoogleSearchConsoleDomains() {
     },
     enabled: !!user?.id
   });
+
+  const handleConnect = async () => {
+    try {
+      const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      const redirectUri = `${window.location.origin}/google-search-console/callback`;
+      const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+      
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error initiating Google auth:', error);
+      toast.error('Failed to connect to Google Search Console');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -52,7 +68,15 @@ export function GoogleSearchConsoleDomains() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-8">Connected Domains</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">Connected Domains</h1>
+        <button
+          onClick={handleConnect}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          {domains?.length ? 'Reconnect to Google Search Console' : 'Connect to Google Search Console'}
+        </button>
+      </div>
       
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
