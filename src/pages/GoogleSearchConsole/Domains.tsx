@@ -10,21 +10,31 @@ export function GoogleSearchConsoleDomains() {
   const { data: domains, isLoading, error } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        throw new Error('Not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
         headers: {
-          'x-user-id': (await supabase.auth.getUser()).data.user?.id || ''
+          'x-user-id': user.id
         }
       });
       
       if (error) throw error;
       return data;
     },
-    retry: false
+    retry: false,
+    staleTime: 30000 // Cache for 30 seconds
   });
 
   const handleConnect = async () => {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Google client ID not configured');
+      }
+
       const redirectUri = `${window.location.origin}/google-search-console/callback`;
       const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
       
@@ -46,19 +56,23 @@ export function GoogleSearchConsoleDomains() {
   }
 
   // Show reconnect button for expired token
-  if (error?.message?.includes('Google access token has expired')) {
+  if (error?.message?.includes('Google access token has expired') || 
+      error?.message?.includes('Google access token not found') ||
+      error?.message?.includes('Google authentication failed')) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-lg mx-auto text-center">
-          <h2 className="text-xl font-semibold mb-4">Google Search Console Connection Expired</h2>
+          <h2 className="text-xl font-semibold mb-4">Google Search Console Connection Required</h2>
           <p className="text-gray-600 mb-6">
-            Your connection to Google Search Console has expired. Please reconnect to continue accessing your data.
+            {error.message === 'Google access token has expired' 
+              ? 'Your connection to Google Search Console has expired. Please reconnect to continue accessing your data.'
+              : 'Please connect your Google Search Console account to access your data.'}
           </p>
           <button
             onClick={handleConnect}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Reconnect to Google Search Console
+            {error.message === 'Google access token has expired' ? 'Reconnect' : 'Connect'} to Google Search Console
           </button>
         </div>
       </div>
@@ -69,7 +83,7 @@ export function GoogleSearchConsoleDomains() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-50 text-red-600 p-4 rounded-lg">
-          Failed to load domains. Please try again.
+          Failed to load domains: {error.message}
         </div>
       </div>
     );
