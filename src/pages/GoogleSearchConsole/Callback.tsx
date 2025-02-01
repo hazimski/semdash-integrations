@@ -33,7 +33,7 @@ export function GoogleSearchConsoleCallback() {
           body: new URLSearchParams({
             code,
             client_id: '875375764767-5v7sebv1p0vkecpku25ab6oafb8lpmo8.apps.googleusercontent.com',
-            client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+            client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
             redirect_uri: `${window.location.origin}/google-search-console/callback`,
             grant_type: 'authorization_code',
           }),
