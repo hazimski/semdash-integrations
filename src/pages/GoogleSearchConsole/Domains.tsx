@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 interface Domain {
   siteUrl: string;
@@ -10,14 +11,25 @@ interface Domain {
 
 export function GoogleSearchConsoleDomains() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: domains, isLoading, error } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('google-search-console-sites');
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
+        headers: {
+          'x-user-id': user.id
+        }
+      });
+      
       if (error) throw error;
       return data as Domain[];
-    }
+    },
+    enabled: !!user?.id
   });
 
   if (isLoading) {
