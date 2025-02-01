@@ -3,48 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id',
-}
-
-async function refreshGoogleToken(supabase: any, userId: string, refreshToken: string) {
-  try {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      }),
-    });
-
-    const data = await response.json();
-    
-    if (data.error) {
-      console.error('Token refresh error:', data);
-      throw new Error(data.error_description || 'Failed to refresh token');
-    }
-
-    // Update tokens in database
-    const { error: updateError } = await supabase
-      .from('user_settings')
-      .update({
-        google_access_token: data.access_token,
-        google_token_expiry: new Date(Date.now() + data.expires_in * 1000).toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId);
-
-    if (updateError) throw updateError;
-    
-    return data.access_token;
-  } catch (error) {
-    console.error('Error refreshing token:', error);
-    throw error;
-  }
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
@@ -53,13 +12,13 @@ serve(async (req) => {
   }
 
   try {
+    // Get user ID from request header
     const userId = req.headers.get('x-user-id')
     if (!userId) {
-      throw new Error('User ID is required')
+      throw new Error('User ID not provided')
     }
 
-    console.log('Fetching Google tokens for user:', userId)
-
+    // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -72,27 +31,62 @@ serve(async (req) => {
       .eq('user_id', userId)
       .single()
 
-    if (settingsError) {
-      console.error('Error fetching user settings:', settingsError)
-      throw new Error('Failed to fetch Google access token')
+    if (settingsError || !settings) {
+      throw new Error('Failed to get user settings')
     }
 
-    if (!settings?.google_access_token) {
-      throw new Error('Google access token not found')
+    const { google_access_token, google_refresh_token, google_token_expiry } = settings
+
+    if (!google_access_token || !google_refresh_token) {
+      throw new Error('Google tokens not found')
     }
 
-    let accessToken = settings.google_access_token;
+    // Check if token needs refresh (if it expires in less than 5 minutes or is expired)
+    const tokenExpiryDate = new Date(google_token_expiry)
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000)
+    
+    let accessToken = google_access_token
 
-    // Check if token is expired and refresh if needed
-    if (settings.google_token_expiry && new Date(settings.google_token_expiry) <= new Date()) {
-      console.log('Token expired, refreshing...');
-      if (!settings.google_refresh_token) {
-        throw new Error('No refresh token available');
+    if (tokenExpiryDate < fiveMinutesFromNow) {
+      console.log('Token expires soon or is expired, refreshing...')
+      
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+          refresh_token: google_refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      })
+
+      const tokens = await response.json()
+      
+      if (tokens.error) {
+        console.error('Token refresh error:', tokens)
+        throw new Error(tokens.error_description || 'Failed to refresh token')
       }
-      accessToken = await refreshGoogleToken(supabase, userId, settings.google_refresh_token);
-    }
 
-    console.log('Fetching sites from Google Search Console')
+      // Update tokens in database
+      const { error: updateError } = await supabase
+        .from('user_settings')
+        .update({
+          google_access_token: tokens.access_token,
+          google_token_expiry: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+
+      if (updateError) {
+        console.error('Error updating tokens:', updateError)
+        throw new Error('Failed to update tokens')
+      }
+
+      accessToken = tokens.access_token
+    }
 
     // Fetch sites from Google Search Console
     const sitesResponse = await fetch(
@@ -104,26 +98,23 @@ serve(async (req) => {
       }
     )
 
-    if (!sitesResponse.ok) {
-      const errorData = await sitesResponse.json()
-      console.error('Google API error:', errorData)
-      throw new Error('Failed to fetch sites from Google Search Console')
+    const sitesData = await sitesResponse.json()
+
+    if (sitesData.error) {
+      console.error('Google API error:', sitesData.error)
+      throw new Error(sitesData.error.message || 'Failed to fetch sites')
     }
 
-    const sites = await sitesResponse.json()
-
     return new Response(
-      JSON.stringify(sites.siteEntry || []),
+      JSON.stringify(sitesData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
   } catch (error) {
-    console.error('Error in google-search-console-sites function:', error)
+    console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 400 
-      }
+      JSON.stringify({ error: error.message || 'Failed to fetch sites from Google Search Console' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
 })
