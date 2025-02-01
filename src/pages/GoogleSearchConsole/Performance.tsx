@@ -28,6 +28,12 @@ export function GoogleSearchConsolePerformance() {
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
+  // Default location and language parameters
+  const currentParams = {
+    location: '2840', // US
+    language: 'en'  // English
+  };
+
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
     queryKey: ['gsc-performance-time', domain, dateRange],
     queryFn: async () => {
