@@ -12,7 +12,15 @@ serve(async (req) => {
   }
 
   try {
-    const { siteUrl, days = 28, dimension = 'query' } = await req.json()
+    const { 
+      siteUrl, 
+      days = 28, 
+      startDate,
+      endDate,
+      dimension = 'query',
+      searchType = 'web',
+      dimensionFilterGroups = []
+    } = await req.json()
     
     const userId = req.headers.get('x-user-id')
     if (!userId) {
@@ -43,9 +51,15 @@ serve(async (req) => {
 
     console.log('Fetching performance data from Google Search Console')
 
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-    const endDate = new Date()
+    let queryStartDate, queryEndDate;
+    if (startDate && endDate) {
+      queryStartDate = new Date(startDate);
+      queryEndDate = new Date(endDate);
+    } else {
+      queryStartDate = new Date();
+      queryStartDate.setDate(queryStartDate.getDate() - days);
+      queryEndDate = new Date();
+    }
 
     // Initialize array to store all results
     let allResults = []
@@ -55,12 +69,13 @@ serve(async (req) => {
     // Keep fetching until we get all results
     do {
       const requestBody = {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        startDate: queryStartDate.toISOString().split('T')[0],
+        endDate: queryEndDate.toISOString().split('T')[0],
         dimensions: [dimension],
         rowLimit: maxRows,
         startRow: startRow,
-        type: 'web',
+        type: searchType,
+        dimensionFilterGroups,
         // If dimension is searchAppearance, we don't include other dimensions
         ...(dimension === 'searchAppearance' ? {} : {
           dataState: 'all'
