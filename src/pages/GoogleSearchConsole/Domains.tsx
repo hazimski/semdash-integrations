@@ -23,7 +23,6 @@ export function GoogleSearchConsoleDomains() {
       });
       
       if (error) {
-        // Add status code to error message if available
         if (status) {
           throw new Error(`${error.message} (Status: ${status})`);
         }
@@ -33,16 +32,14 @@ export function GoogleSearchConsoleDomains() {
       return data;
     },
     retry: false,
-    staleTime: 30000 // Cache for 30 seconds
+    staleTime: 30000
   });
 
   const handleConnect = async () => {
     try {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        throw new Error('Google client ID not configured');
-      }
-
+      // Using the hardcoded client ID since it's a public value
+      const clientId = '875375764767-5v7sebv1p0vkecpku25ab6oafb8lpmo8.apps.googleusercontent.com';
+      
       const redirectUri = `${window.location.origin}/google-search-console/callback`;
       const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
       
@@ -63,7 +60,6 @@ export function GoogleSearchConsoleDomains() {
     );
   }
 
-  // Show reconnect button for expired token
   if (error?.message?.includes('Google access token has expired') || 
       error?.message?.includes('Google access token not found') ||
       error?.message?.includes('Google authentication failed')) {
