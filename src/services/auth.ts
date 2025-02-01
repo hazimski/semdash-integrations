@@ -55,10 +55,24 @@ export async function signIn(email: string, password: string) {
 
 export async function logOut() {
   try {
+    // Check if there's an active session first
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      // If no session exists, just clear any local state
+      console.log('No active session found during logout');
+      return;
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   } catch (error) {
     console.error('Error during logout:', error);
+    // Don't throw error for missing session, just log it
+    if (error instanceof Error && error.message.includes('Auth session missing')) {
+      console.log('No active session to log out from');
+      return;
+    }
     throw new Error('Failed to log out. Please try again.');
   }
 }
