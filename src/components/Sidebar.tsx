@@ -23,7 +23,9 @@ export function Sidebar() {
     {
       title: 'SERP CHECKER',
       items: [
-        { icon: History, label: 'Historical SERP', path: '/serp-checker' }      ]
+        { icon: History, label: 'Historical SERP', path: '/serp-checker' },
+        { icon: MapPin, label: 'Local SERP', path: '/local-serp' }
+      ]
     },
     {
       title: 'KEYWORD Research',
@@ -48,10 +50,11 @@ export function Sidebar() {
       title: 'AI SEO Tools',
       items: [
         { icon: Boxes, label: 'Keyword Clustering', path: '/keyword-clustering' },
-        { icon: Map, label: 'Topical Map', path: '/topical-map' }
+        { icon: Map, label: 'Topical Map', path: '/topical-map' },
+        { icon: BarChart2, label: 'Search Console', path: '/google-search-console/domains' }
       ]
     },
-     {
+    {
       title: 'Account',
       items: [
         { icon: Cog, label: 'Settings', path: '/settings' },

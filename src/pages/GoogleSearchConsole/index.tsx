@@ -1,9 +1,51 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../config/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 export function GoogleSearchConsole() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const { data: settings } = useQuery({
+    queryKey: ['user-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('google_access_token')
+        .eq('user_id', user?.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  const { data: domains } = useQuery({
+    queryKey: ['gsc-domains'],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
+        headers: {
+          'x-user-id': user.id
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!settings?.google_access_token
+  });
+
+  React.useEffect(() => {
+    if (settings?.google_access_token && domains?.length > 0) {
+      navigate(`/google-search-console/performance/${encodeURIComponent(domains[0].siteUrl)}`);
+    }
+  }, [settings, domains, navigate]);
   
   const handleGoogleAuth = () => {
     const redirectUri = `${window.location.origin}/google-search-console/callback`;
@@ -21,6 +63,14 @@ export function GoogleSearchConsole() {
 
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   };
+
+  if (settings?.google_access_token) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

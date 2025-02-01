@@ -1,21 +1,13 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeft, ChevronRight, Download, ListPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
-
-interface PerformanceData {
-  key: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
 
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
@@ -26,6 +18,25 @@ export function GoogleSearchConsolePerformance() {
   const [itemsPerPage] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Query for available domains
+  const { data: domains } = useQuery({
+    queryKey: ['gsc-domains'],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
+        headers: {
+          'x-user-id': user.id
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
 
   // Default location and language parameters
   const currentParams = {
@@ -120,36 +131,27 @@ export function GoogleSearchConsolePerformance() {
     toast.success('CSV file exported successfully');
   };
 
-  const handleSelectAll = () => {
-    if (selectedQueries.size === dimensionData?.length) {
-      setSelectedQueries(new Set());
-    } else {
-      setSelectedQueries(new Set(dimensionData?.map(item => item.key) || []));
-    }
-  };
-
-  const handleSelectQuery = (query: string) => {
-    const newSelected = new Set(selectedQueries);
-    if (newSelected.has(query)) {
-      newSelected.delete(query);
-    } else {
-      newSelected.add(query);
-    }
-    setSelectedQueries(newSelected);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    if (activeDimension === 'page') {
-      setCurrentPagesPage(newPage);
-    } else {
-      setCurrentPage(newPage);
-    }
+  const handleDomainChange = (newDomain: string) => {
+    navigate(`/google-search-console/performance/${encodeURIComponent(newDomain)}`);
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Performance: {decodeURIComponent(domain || '')}</h1>
+        <div className="flex flex-col space-y-4">
+          <h1 className="text-2xl font-bold">Performance</h1>
+          <select 
+            value={domain} 
+            onChange={(e) => handleDomainChange(e.target.value)}
+            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {domains?.map((site: any) => (
+              <option key={site.siteUrl} value={site.siteUrl}>
+                {site.siteUrl}
+              </option>
+            ))}
+          </select>
+        </div>
         
         <div className="flex gap-2">
           <button
@@ -183,26 +185,67 @@ export function GoogleSearchConsolePerformance() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.clicks, 0).toLocaleString()}
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.clicks, 0).toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.impressions, 0).toLocaleString()}
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.impressions, 0).toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.ctr, 0) / (timeSeriesData?.length || 1)).toFixed(2)}%
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.ctr, 0) / (timeSeriesData?.length || 1)).toFixed(2)}%
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average Position</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
               </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow mb-8">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Performance Over Time</h3>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date"
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return date.toLocaleDateString('default', { 
+                          month: 'short',
+                          day: 'numeric'
+                        });
+                      }}
+                    />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="clicks"
+                      stroke="#2563eb"
+                      name="Clicks"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="impressions"
+                      stroke="#10b981"
+                      name="Impressions"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
@@ -295,7 +338,7 @@ export function GoogleSearchConsolePerformance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentData.map((item: PerformanceData) => (
+                  {currentData.map((item: any) => (
                     <tr key={item.key} className="border-t">
                       <td className="py-4 pr-4">
                         <input
