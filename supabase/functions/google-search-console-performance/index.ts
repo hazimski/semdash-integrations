@@ -51,7 +51,6 @@ serve(async (req) => {
       endDate: new Date().toISOString().split('T')[0],
       dimensions: [dimension],
       rowLimit: 25000, // Maximum allowed by GSC API
-      aggregationType: 'byProperty', // This matches GSC dashboard aggregation
       dataState: 'all' // Include all data states
     }
 
