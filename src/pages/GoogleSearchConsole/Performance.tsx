@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
-import { Download } from 'lucide-react';
-import { saveAs } from 'file-saver';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../../hooks/useAuth';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
+import { saveAs } from 'file-saver';
 
 export function GoogleSearchConsolePerformance() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const { domain } = useParams<{ domain: string }>();
+  const [dateRange, setDateRange] = useState('28');
+  const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPagesPage, setCurrentPagesPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const { data: domains, isLoading: isLoadingDomains } = useQuery({
+  // Query for available domains
+  const { data: domains } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -24,183 +32,384 @@ export function GoogleSearchConsolePerformance() {
         }
       });
       
-      if (error) {
-        toast.error('Failed to fetch domains');
-        throw error;
-      }
-      return data?.siteEntry || [];
+      if (error) throw error;
+      return data;
     },
     enabled: !!user?.id
   });
 
-  const currentDomain = searchParams.get('domain') || domains?.[0]?.siteUrl;
-  const startDate = searchParams.get('startDate') || format(new Date(Date.now() - 28 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
-  const endDate = searchParams.get('endDate') || format(new Date(), 'yyyy-MM-dd');
-  const dimension = searchParams.get('dimension') || 'query';
+  // Default location and language parameters
+  const currentParams = {
+    location: '2840', // US
+    language: 'en'  // English
+  };
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['gsc-performance', { domain: currentDomain, startDate, endDate, dimension }],
+  const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
+    queryKey: ['gsc-performance-time', domain, dateRange],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
-      if (!currentDomain) throw new Error('No domain selected');
-
+      
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
-        body: {
-          siteUrl: currentDomain,
-          startDate,
-          endDate,
-          dimensions: [dimension]
+        body: { 
+          siteUrl: decodeURIComponent(domain || ''),
+          days: parseInt(dateRange),
+          dimension: 'date'
         },
         headers: {
           'x-user-id': user.id
         }
       });
-
-      if (error) {
-        toast.error('Failed to fetch performance data');
-        throw error;
-      }
+      
+      if (error) throw error;
       return data;
     },
-    enabled: !!currentDomain && !!user?.id
+    enabled: !!user?.id && !!domain
   });
 
-  const handleDomainChange = (domain: string) => {
-    setSearchParams(prev => {
-      prev.set('domain', domain);
-      return prev;
-    });
+  const { data: dimensionData, isLoading: dimensionLoading } = useQuery({
+    queryKey: ['gsc-performance-dimension', domain, dateRange, activeDimension],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
+        body: { 
+          siteUrl: decodeURIComponent(domain || ''),
+          days: parseInt(dateRange),
+          dimension: activeDimension
+        },
+        headers: {
+          'x-user-id': user.id
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && !!domain
+  });
+
+  const isLoading = timeSeriesLoading || dimensionLoading;
+  const totalItems = dimensionData?.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  
+  const getCurrentPage = () => {
+    return activeDimension === 'page' ? currentPagesPage : currentPage;
   };
+
+  const startIndex = (getCurrentPage() - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = dimensionData?.slice(startIndex, endIndex) || [];
 
   const handleExport = () => {
-    if (!data?.rows) return;
+    if (!dimensionData?.length) return;
 
-    const headers = ['Query', 'Clicks', 'Impressions', 'CTR', 'Position'];
-    const csvData = data.rows.map(item => [
-      item.keys[0],
-      item.clicks,
-      item.impressions,
-      `${(item.ctr * 100).toFixed(2)}%`,
-      item.position.toFixed(2)
-    ]);
+    const dataToExport = selectedQueries.size > 0 
+      ? dimensionData.filter(item => selectedQueries.has(item.key))
+      : dimensionData;
 
-    const csvContent = [
+    const headers = [
+      activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance',
+      'Clicks',
+      'Impressions',
+      'CTR',
+      'Position'
+    ];
+
+    const csvData = [
       headers.join(','),
-      ...csvData.map(row => row.join(','))
+      ...dataToExport.map(item => [
+        item.key,
+        item.clicks,
+        item.impressions,
+        item.ctr,
+        item.position.toFixed(1)
+      ].join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `gsc-performance-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `gsc_${activeDimension}_${domain}_${dateRange}days.csv`);
+    toast.success('CSV file exported successfully');
   };
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Search Console Performance</h1>
-        <div className="bg-red-50 p-4 rounded-lg text-red-700">
-          {error instanceof Error ? error.message : 'Failed to load performance data'}
-        </div>
-      </div>
-    );
-  }
+  const handleDomainChange = (newDomain: string) => {
+    navigate(`/google-search-console/performance/${encodeURIComponent(newDomain)}`);
+  };
+
+  const handleSelectAll = () => {
+    if (dimensionData) {
+      if (selectedQueries.size === dimensionData.length) {
+        setSelectedQueries(new Set());
+      } else {
+        setSelectedQueries(new Set(dimensionData.map(item => item.key)));
+      }
+    }
+  };
+
+  const handleSelectQuery = (key: string) => {
+    const newSelectedQueries = new Set(selectedQueries);
+    if (selectedQueries.has(key)) {
+      newSelectedQueries.delete(key);
+    } else {
+      newSelectedQueries.add(key);
+    }
+    setSelectedQueries(newSelectedQueries);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (activeDimension === 'page') {
+      setCurrentPagesPage(newPage);
+    } else {
+      setCurrentPage(newPage);
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Search Console Performance</h1>
-      
-      {isLoadingDomains ? (
-        <div>Loading domains...</div>
-      ) : domains?.length === 0 ? (
-        <div className="bg-yellow-50 p-4 rounded-lg text-yellow-700">
-          No domains found. Please add a domain to Google Search Console.
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col space-y-4">
+          <h1 className="text-2xl font-bold">Performance</h1>
+          <select 
+            value={domain} 
+            onChange={(e) => handleDomainChange(e.target.value)}
+            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {domains?.map((site: any) => (
+              <option key={site.siteUrl} value={site.siteUrl}>
+                {site.siteUrl}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDateRange('7')}
+            className={`px-4 py-2 rounded-lg ${dateRange === '7' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+          >
+            Last 7 days
+          </button>
+          <button
+            onClick={() => setDateRange('28')}
+            className={`px-4 py-2 rounded-lg ${dateRange === '28' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+          >
+            Last 28 days
+          </button>
+          <button
+            onClick={() => setDateRange('90')}
+            className={`px-4 py-2 rounded-lg ${dateRange === '90' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+          >
+            Last 3 months
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center h-96">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <select 
-                value={currentDomain || ''} 
-                onChange={(e) => handleDomainChange(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2"
-              >
-                {domains?.map((domain: any) => (
-                  <option key={domain.siteUrl} value={domain.siteUrl}>
-                    {domain.siteUrl}
-                  </option>
-                ))}
-              </select>
-              <h2 className="text-lg font-semibold">
-                Results ({data?.rows?.length || 0})
-              </h2>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
+              <p className="text-3xl font-bold">
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.clicks, 0).toLocaleString()}
+              </p>
             </div>
-            <button
-              onClick={handleExport}
-              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </button>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
+              <p className="text-3xl font-bold">
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.impressions, 0).toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
+              <p className="text-3xl font-bold">
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.ctr, 0) / (timeSeriesData?.length || 1)).toFixed(2)}%
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-semibold mb-2">Average Position</h3>
+              <p className="text-3xl font-bold">
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
+              </p>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Query
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Clicks
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Impressions
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    CTR
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Position
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : data?.rows?.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      No data available
-                    </td>
-                  </tr>
-                ) : (
-                  data?.rows?.map((row: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.keys[0]}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.clicks}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.impressions}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(row.ctr * 100).toFixed(2)}%
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.position.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="bg-white rounded-lg shadow mb-8">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Performance Over Time</h3>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date"
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return date.toLocaleDateString('default', { 
+                          month: 'short',
+                          day: 'numeric'
+                        });
+                      }}
+                    />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="clicks"
+                      stroke="#2563eb"
+                      name="Clicks"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="impressions"
+                      stroke="#10b981"
+                      name="Impressions"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="bg-white rounded-lg shadow">
+            {selectedQueries.size > 0 && (
+              <KeywordListActions
+                selectedKeywords={selectedQueries}
+                onClearSelection={() => setSelectedQueries(new Set())}
+                locationName={currentParams.location}
+                languageName={currentParams.language}
+                keywords={dimensionData?.filter(item => selectedQueries.has(item.key)).map(item => ({
+                  keyword: item.key,
+                  searchVolume: item.impressions,
+                  cpc: 0,
+                  keywordDifficulty: 0,
+                  intent: 'informational',
+                  source: 'GSC'
+                }))}
+              />
+            )}
+
+            <div className="border-b">
+              <nav className="flex">
+                <button
+                  onClick={() => setActiveDimension('query')}
+                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'query' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Queries
+                </button>
+                <button
+                  onClick={() => setActiveDimension('page')}
+                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'page' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Pages
+                </button>
+                <button
+                  onClick={() => setActiveDimension('country')}
+                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'country' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Countries
+                </button>
+                <button
+                  onClick={() => setActiveDimension('device')}
+                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'device' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Devices
+                </button>
+                <button
+                  onClick={() => setActiveDimension('searchAppearance')}
+                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'searchAppearance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Search Appearance
+                </button>
+              </nav>
+            </div>
+
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm text-gray-600">
+                  {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleExport}
+                    disabled={!dimensionData?.length}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-gray-500">
+                    <th className="pb-4 pr-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedQueries.size === dimensionData?.length}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                    <th className="pb-4">{activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance'}</th>
+                    <th className="pb-4 text-right">Clicks</th>
+                    <th className="pb-4 text-right">Impressions</th>
+                    <th className="pb-4 text-right">CTR</th>
+                    <th className="pb-4 text-right">Position</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentData.map((item: any) => (
+                    <tr key={item.key} className="border-t">
+                      <td className="py-4 pr-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedQueries.has(item.key)}
+                          onChange={() => handleSelectQuery(item.key)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="py-4">{item.key}</td>
+                      <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
+                      <td className="py-4 text-right">{item.impressions.toLocaleString()}</td>
+                      <td className="py-4 text-right">{(item.ctr).toFixed(2)}%</td>
+                      <td className="py-4 text-right">{item.position.toFixed(1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex justify-between items-center mt-4">
+                <div className="text-sm text-gray-600">
+                  Page {getCurrentPage()} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handlePageChange(getCurrentPage() - 1)}
+                    disabled={getCurrentPage() === 1}
+                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(getCurrentPage() + 1)}
+                    disabled={getCurrentPage() === totalPages}
+                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
