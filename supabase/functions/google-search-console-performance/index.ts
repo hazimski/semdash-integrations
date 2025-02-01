@@ -59,6 +59,8 @@ serve(async (req) => {
           startDate: startDate.toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
           dimensions: ['date'],
+          rowLimit: 500,
+          aggregationType: 'auto'
         }),
       }
     )
@@ -70,9 +72,20 @@ serve(async (req) => {
     }
 
     const performance = await performanceResponse.json()
+    
+    // Transform the data to match Google Search Console format
+    const transformedData = performance.rows?.map((row: any) => ({
+      date: row.keys[0],
+      clicks: Math.round(row.clicks || 0),
+      impressions: Math.round(row.impressions || 0),
+      ctr: parseFloat(((row.ctr || 0) * 100).toFixed(2)),
+      position: parseFloat(row.position?.toFixed(1) || '0')
+    })) || []
+
+    console.log('Transformed data:', transformedData)
 
     return new Response(
-      JSON.stringify(performance.rows || []),
+      JSON.stringify(transformedData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
