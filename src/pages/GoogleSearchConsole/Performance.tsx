@@ -15,6 +15,7 @@ export function GoogleSearchConsolePerformance() {
   const [currentPagesPage, setCurrentPagesPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<{dimension: string, expression: string} | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -35,12 +36,6 @@ export function GoogleSearchConsolePerformance() {
     },
     enabled: !!user?.id
   });
-
-  // Default location and language parameters
-  const currentParams = {
-    location: '2840', // US
-    language: 'en'  // English
-  };
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
     queryKey: ['gsc-performance-time', domain, dateRange],
@@ -65,16 +60,28 @@ export function GoogleSearchConsolePerformance() {
   });
 
   const { data: dimensionData, isLoading: dimensionLoading } = useQuery({
-    queryKey: ['gsc-performance-dimension', domain, dateRange, activeDimension],
+    queryKey: ['gsc-performance-dimension', domain, dateRange, activeDimension, activeFilter],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
       
+      const payload: any = { 
+        siteUrl: decodeURIComponent(domain || ''),
+        days: parseInt(dateRange),
+        dimension: activeDimension
+      };
+
+      // Add filter if exists
+      if (activeFilter) {
+        payload.dimensionFilterGroups = [{
+          filters: [{
+            dimension: activeFilter.dimension,
+            expression: activeFilter.expression
+          }]
+        }];
+      }
+      
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
-        body: { 
-          siteUrl: decodeURIComponent(domain || ''),
-          days: parseInt(dateRange),
-          dimension: activeDimension
-        },
+        body: payload,
         headers: {
           'x-user-id': user.id
         }
@@ -150,6 +157,19 @@ export function GoogleSearchConsolePerformance() {
       newSelectedQueries.add(key);
     }
     setSelectedQueries(newSelectedQueries);
+  };
+
+  const handleRowClick = (key: string) => {
+    if (activeDimension === 'query') {
+      setActiveFilter({ dimension: 'query', expression: key });
+      setActiveDimension('page');
+    } else if (activeDimension === 'page') {
+      setActiveFilter({ dimension: 'page', expression: key });
+      setActiveDimension('query');
+    }
+    // Reset pagination when switching dimensions
+    setCurrentPage(1);
+    setCurrentPagesPage(1);
   };
 
   const handlePageChange = (newPage: number) => {
@@ -296,34 +316,22 @@ export function GoogleSearchConsolePerformance() {
             <div className="border-b">
               <nav className="flex">
                 <button
-                  onClick={() => setActiveDimension('query')}
+                  onClick={() => {
+                    setActiveDimension('query');
+                    setActiveFilter(null);
+                  }}
                   className={`px-6 py-4 text-sm font-medium ${activeDimension === 'query' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
                 >
                   Queries
                 </button>
                 <button
-                  onClick={() => setActiveDimension('page')}
+                  onClick={() => {
+                    setActiveDimension('page');
+                    setActiveFilter(null);
+                  }}
                   className={`px-6 py-4 text-sm font-medium ${activeDimension === 'page' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
                 >
                   Pages
-                </button>
-                <button
-                  onClick={() => setActiveDimension('country')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'country' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Countries
-                </button>
-                <button
-                  onClick={() => setActiveDimension('device')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'device' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Devices
-                </button>
-                <button
-                  onClick={() => setActiveDimension('searchAppearance')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'searchAppearance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Search Appearance
                 </button>
               </nav>
             </div>
@@ -340,7 +348,7 @@ export function GoogleSearchConsolePerformance() {
                       value={itemsPerPage}
                       onChange={(e) => {
                         setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1); // Reset to first page when changing items per page
+                        setCurrentPage(1);
                       }}
                       className="border border-gray-300 rounded px-2 py-1 text-sm"
                     >
@@ -364,6 +372,20 @@ export function GoogleSearchConsolePerformance() {
                 </div>
               </div>
 
+              {activeFilter && (
+                <div className="mb-4 p-2 bg-blue-50 rounded-lg flex items-center justify-between">
+                  <span className="text-sm text-blue-700">
+                    Filtered by {activeFilter.dimension}: {activeFilter.expression}
+                  </span>
+                  <button
+                    onClick={() => setActiveFilter(null)}
+                    className="text-blue-700 hover:text-blue-900 text-sm font-medium"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-gray-500">
@@ -384,8 +406,12 @@ export function GoogleSearchConsolePerformance() {
                 </thead>
                 <tbody>
                   {currentData.map((item: any) => (
-                    <tr key={item.key} className="border-t">
-                      <td className="py-4 pr-4">
+                    <tr 
+                      key={item.key} 
+                      className="border-t cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => handleRowClick(item.key)}
+                    >
+                      <td className="py-4 pr-4" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedQueries.has(item.key)}
