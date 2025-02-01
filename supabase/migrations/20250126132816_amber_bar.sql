@@ -1,0 +1,1 @@
+-- This migration can be deleted since we're not using URL shortening anymore
