@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { getUserSettings } from '../../services/settings';
+import { getUserSettings, updateOpenAIKey } from '../../services/settings';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
@@ -24,6 +24,22 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
   const [analysis, setAnalysis] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await getUserSettings();
+      setHasApiKey(!!settings?.openai_api_key);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
 
   useEffect(() => {
     let messageInterval: NodeJS.Timeout;
@@ -41,92 +57,87 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
     };
   }, [isLoading]);
 
+  const handleSaveApiKey = async () => {
+    if (!apiKey.startsWith('sk-')) {
+      toast.error('Invalid API key format. It should start with "sk-"');
+      return;
+    }
+
+    try {
+      await updateOpenAIKey(apiKey);
+      setHasApiKey(true);
+      setShowApiKeyDialog(false);
+      toast.success('API key saved successfully');
+      generateAnalysis();
+    } catch (error) {
+      toast.error('Failed to save API key');
+    }
+  };
+
   useEffect(() => {
-    const generateAnalysis = async () => {
-      if (!data || !isOpen) return;
+    if (isOpen && data && !hasApiKey) {
+      setShowApiKeyDialog(true);
+    } else if (isOpen && data && hasApiKey && !analysis) {
+      generateAnalysis();
+    }
+  }, [isOpen, data, hasApiKey]);
 
-      try {
-        setIsLoading(true);
-        setMessageIndex(0);
-        const settings = await getUserSettings();
-        
-        if (!settings?.openai_api_key) {
-          toast.error('OpenAI API key required');
-          onClose();
-          return;
-        }
+  const generateAnalysis = async () => {
+    if (!data) return;
 
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: `You are an expert SEO specialist tasked with analyzing the following SERP (Search Engine Results Page) data. Your goal is to provide a comprehensive, actionable analysis and a prioritized action plan for improving rankings and capitalizing on SERP opportunities.\n\n
-User Intent Breakdown:\n
-- Analyze the user intent for each result and categorize it as Information, Transactional, Navigational, or Commercial. Provide a percentage breakdown for each intent type across the SERP. Explain why you categorize a result as such, referencing the data (e.g., keywords, titles, meta descriptions, featured snippets, etc.).\n
-- Provide examples for each intent type from the SERP results and explain your reasoning behind the categorization.\n\n
-Actionable Insights:\n
-- Based solely on the provided SERP data, outline specific, data-driven recommendations.\n
-- Offer actionable SEO tips that are directly tied to the patterns or insights you derive from the SERP results.\n
-- Ensure all recommendations are specific, not generalized. Avoid fluff—recommend practical, clear actions with detailed explanations.\n
-- Reference why each tip is necessary and how it can help improve rankings.\n\n
-Detailed Action Plan:\n
-- Create a detailed and prioritized action plan, including the most impactful SEO strategies to implement based on the provided SERP data.\n
-- Identify target keywords to pursue based on trends in titles, descriptions, and estimated traffic (etv).\n
-- For each keyword:\n
-  - Suggest content types to create (e.g., blogs, videos, product pages).\n
-  - Recommend the number of backlinks to aim for, using competitor data (referring_main_domains, dofollow, backlinks) as benchmarks.\n
-  - Provide examples of relevant publications or websites for link-building.\n
-- Clearly articulate the reasoning behind each action, avoiding assumptions or speculative advice. Use data from the provided API response to inform every step.\n
-- Focus on leverage points in the SERP (such as featured snippets, PAA boxes, local packs, etc.) and provide specific tactics to capitalize on those opportunities.\n\n
-Examples and Specificity:\n
-- Every insight and recommendation should be backed by specific examples from the data you are analyzing. For instance, if certain content types appear more frequently in the SERP, suggest strategies that align with those content types (e.g., long-form content, videos, product pages, etc.).\n
-- Do not provide general SEO advice (e.g., “use better keywords” or “optimize meta descriptions”). Instead, reference exact data points from the SERP to justify each recommendation.\n\n
-Priority and Impact:\n
-- Prioritize the recommendations by expected impact on rankings. Which actions should be tackled first for the most significant effect?\n
-- Be clear and methodical in how you present the data and your insights.\n
-- Remember: Your analysis must strictly be based on the provided SERP data—do not make any assumptions or provide insights not directly derived from the data. Avoid unnecessary conjecture or irrelevant advice.`
-              },
-              {
-                role: 'user',
-                content: JSON.stringify(data, null, 2)
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${settings.openai_api_key}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        const content = response.data.choices[0]?.message?.content;
-        if (!content) throw new Error('No analysis generated');
-        
-        setAnalysis(content);
-      } catch (error: any) {
-        console.error('Error generating analysis:', error);
-        
-        // Handle rate limit error
-        if (error.response?.data?.error?.code === 'rate_limit_exceeded') {
-          toast.error(error.response.data.error.message);
-        } else {
-          toast.error('Failed to generate analysis');
-        }
-        
-        onClose();
-      } finally {
-        setIsLoading(false);
+    try {
+      setIsLoading(true);
+      setMessageIndex(0);
+      const settings = await getUserSettings();
+      
+      if (!settings?.openai_api_key) {
+        setShowApiKeyDialog(true);
+        return;
       }
-    };
 
-    generateAnalysis();
-  }, [data, isOpen]);
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert SEO specialist tasked with analyzing the following SERP (Search Engine Results Page) data...`
+            },
+            {
+              role: 'user',
+              content: JSON.stringify(data, null, 2)
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${settings.openai_api_key}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const content = response.data.choices[0]?.message?.content;
+      if (!content) throw new Error('No analysis generated');
+      
+      setAnalysis(content);
+    } catch (error: any) {
+      console.error('Error generating analysis:', error);
+      
+      if (error.response?.data?.error?.code === 'rate_limit_exceeded') {
+        toast.error(error.response.data.error.message);
+      } else {
+        toast.error('Failed to generate analysis');
+      }
+      
+      onClose();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -144,7 +155,48 @@ Priority and Impact:\n
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {isLoading ? (
+          {showApiKeyDialog ? (
+            <div className="bg-white p-6 rounded-lg">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  OpenAI API Key Required
+                </h3>
+                <p className="text-sm text-gray-500 mt-2">
+                  To use AI Analysis, you need to provide your OpenAI API key. This key will be securely stored and used only for generating SEO recommendations.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveApiKey}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                  >
+                    Save API Key
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex flex-col items-center justify-center h-full space-y-4">
               <div className="w-32 h-32">
                 <DotLottieReact
