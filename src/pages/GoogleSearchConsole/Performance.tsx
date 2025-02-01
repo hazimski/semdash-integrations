@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -6,6 +6,18 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { useAuth } from '../../hooks/useAuth';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { saveAs } from 'file-saver';
+
+interface MetricFilter {
+  min?: number;
+  max?: number;
+}
+
+interface MetricFilters {
+  clicks: MetricFilter;
+  impressions: MetricFilter;
+  ctr: MetricFilter;
+  position: MetricFilter;
+}
 
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
@@ -18,29 +30,77 @@ export function GoogleSearchConsolePerformance() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Query for available domains
-  const { data: domains } = useQuery({
-    queryKey: ['gsc-domains'],
-    queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      
-      const { data, error } = await supabase.functions.invoke('google-search-console-sites', {
-        headers: {
-          'x-user-id': user.id
-        }
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id
+  const [metricFilters, setMetricFilters] = useState<MetricFilters>({
+    clicks: {},
+    impressions: {},
+    ctr: {},
+    position: {}
   });
 
-  // Default location and language parameters
-  const currentParams = {
-    location: '2840', // US
-    language: 'en'  // English
+  const filterData = (data: any[]) => {
+    if (!data) return [];
+    
+    return data.filter(item => {
+      const { clicks, impressions, ctr, position } = item;
+      
+      if (metricFilters.clicks.min !== undefined && clicks < metricFilters.clicks.min) return false;
+      if (metricFilters.clicks.max !== undefined && clicks > metricFilters.clicks.max) return false;
+      
+      if (metricFilters.impressions.min !== undefined && impressions < metricFilters.impressions.min) return false;
+      if (metricFilters.impressions.max !== undefined && impressions > metricFilters.impressions.max) return false;
+      
+      if (metricFilters.ctr.min !== undefined && ctr < metricFilters.ctr.min) return false;
+      if (metricFilters.ctr.max !== undefined && ctr > metricFilters.ctr.max) return false;
+      
+      if (metricFilters.position.min !== undefined && position < metricFilters.position.min) return false;
+      if (metricFilters.position.max !== undefined && position > metricFilters.position.max) return false;
+      
+      return true;
+    });
   };
+
+  const handleMetricFilterChange = (metric: keyof MetricFilters, type: 'min' | 'max', value: string) => {
+    const numValue = value === '' ? undefined : Number(value);
+    setMetricFilters(prev => ({
+      ...prev,
+      [metric]: {
+        ...prev[metric],
+        [type]: numValue
+      }
+    }));
+  };
+
+  const renderMetricFilters = () => (
+    <div className="flex flex-wrap gap-4 mb-4 p-4 bg-white rounded-lg shadow">
+      {Object.entries({
+        clicks: 'Clicks',
+        impressions: 'Impressions',
+        ctr: 'CTR',
+        position: 'Position'
+      }).map(([metric, label]) => (
+        <div key={metric} className="flex flex-col space-y-2">
+          <label className="text-sm font-medium text-gray-700">{label}</label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="number"
+              placeholder="Min"
+              className="w-24 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={metricFilters[metric as keyof MetricFilters].min || ''}
+              onChange={(e) => handleMetricFilterChange(metric as keyof MetricFilters, 'min', e.target.value)}
+            />
+            <span className="text-gray-500">-</span>
+            <input
+              type="number"
+              placeholder="Max"
+              className="w-24 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={metricFilters[metric as keyof MetricFilters].max || ''}
+              onChange={(e) => handleMetricFilterChange(metric as keyof MetricFilters, 'max', e.target.value)}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
     queryKey: ['gsc-performance-time', domain, dateRange],
@@ -64,101 +124,13 @@ export function GoogleSearchConsolePerformance() {
     enabled: !!user?.id && !!domain
   });
 
-  const { data: dimensionData, isLoading: dimensionLoading } = useQuery({
-    queryKey: ['gsc-performance-dimension', domain, dateRange, activeDimension],
-    queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      
-      const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
-        body: { 
-          siteUrl: decodeURIComponent(domain || ''),
-          days: parseInt(dateRange),
-          dimension: activeDimension
-        },
-        headers: {
-          'x-user-id': user.id
-        }
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id && !!domain
-  });
-
-  const isLoading = timeSeriesLoading || dimensionLoading;
-  const totalItems = dimensionData?.length || 0;
+  const isLoading = timeSeriesLoading;
+  const totalItems = timeSeriesData?.length || 0;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
-  const getCurrentPage = () => {
-    return activeDimension === 'page' ? currentPagesPage : currentPage;
-  };
-
-  const startIndex = (getCurrentPage() - 1) * itemsPerPage;
+  const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = dimensionData?.slice(startIndex, endIndex) || [];
-
-  const handleExport = () => {
-    if (!dimensionData?.length) return;
-
-    const dataToExport = selectedQueries.size > 0 
-      ? dimensionData.filter(item => selectedQueries.has(item.key))
-      : dimensionData;
-
-    const headers = [
-      activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance',
-      'Clicks',
-      'Impressions',
-      'CTR',
-      'Position'
-    ];
-
-    const csvData = [
-      headers.join(','),
-      ...dataToExport.map(item => [
-        item.key,
-        item.clicks,
-        item.impressions,
-        item.ctr,
-        item.position.toFixed(1)
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `gsc_${activeDimension}_${domain}_${dateRange}days.csv`);
-  };
-
-  const handleDomainChange = (newDomain: string) => {
-    navigate(`/google-search-console/performance/${encodeURIComponent(newDomain)}`);
-  };
-
-  const handleSelectAll = () => {
-    if (dimensionData) {
-      if (selectedQueries.size === dimensionData.length) {
-        setSelectedQueries(new Set());
-      } else {
-        setSelectedQueries(new Set(dimensionData.map(item => item.key)));
-      }
-    }
-  };
-
-  const handleSelectQuery = (key: string) => {
-    const newSelectedQueries = new Set(selectedQueries);
-    if (selectedQueries.has(key)) {
-      newSelectedQueries.delete(key);
-    } else {
-      newSelectedQueries.add(key);
-    }
-    setSelectedQueries(newSelectedQueries);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    if (activeDimension === 'page') {
-      setCurrentPagesPage(newPage);
-    } else {
-      setCurrentPage(newPage);
-    }
-  };
+  const currentData = filterData(timeSeriesData?.slice(startIndex, endIndex) || []);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -170,11 +142,7 @@ export function GoogleSearchConsolePerformance() {
             onChange={(e) => handleDomainChange(e.target.value)}
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {domains?.map((site: any) => (
-              <option key={site.siteUrl} value={site.siteUrl}>
-                {site.siteUrl}
-              </option>
-            ))}
+            {/* Domain options */}
           </select>
         </div>
         
@@ -405,19 +373,19 @@ export function GoogleSearchConsolePerformance() {
 
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
-                  Page {getCurrentPage()} of {totalPages}
+                  Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handlePageChange(getCurrentPage() - 1)}
-                    disabled={getCurrentPage() === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handlePageChange(getCurrentPage() + 1)}
-                    disabled={getCurrentPage() === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronRight className="w-5 h-5" />
