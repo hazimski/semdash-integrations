@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { saveAs } from 'file-saver';
-import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
+import { toast } from 'react-hot-toast';
 
 export function GoogleSearchConsolePerformance() {
-  const [searchParams] = useSearchParams();
-  const [dateRange, setDateRange] = useState('last28days');
-  const [activeDimension, setActiveDimension] = useState('query');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
-  const { data: domains } = useQuery({
+  const { data: domains, isLoading: isLoadingDomains } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -26,47 +24,53 @@ export function GoogleSearchConsolePerformance() {
         }
       });
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        toast.error('Failed to fetch domains');
+        throw error;
+      }
+      return data?.siteEntry || [];
     },
     enabled: !!user?.id
   });
 
-  const currentParams = {
-    domain: searchParams.get('domain') || '',
-    startDate: searchParams.get('startDate') || format(new Date(), 'yyyy-MM-dd'),
-    endDate: searchParams.get('endDate') || format(new Date(), 'yyyy-MM-dd'),
-    dimension: searchParams.get('dimension') || 'query'
-  };
+  const currentDomain = searchParams.get('domain') || domains?.[0]?.siteUrl;
+  const startDate = searchParams.get('startDate') || format(new Date(Date.now() - 28 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const endDate = searchParams.get('endDate') || format(new Date(), 'yyyy-MM-dd');
+  const dimension = searchParams.get('dimension') || 'query';
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['gsc-performance', currentParams],
+    queryKey: ['gsc-performance', { domain: currentDomain, startDate, endDate, dimension }],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
+      if (!currentDomain) throw new Error('No domain selected');
 
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
         body: {
-          siteUrl: currentParams.domain,
-          startDate: currentParams.startDate,
-          endDate: currentParams.endDate,
-          dimensions: [currentParams.dimension]
+          siteUrl: currentDomain,
+          startDate,
+          endDate,
+          dimensions: [dimension]
         },
         headers: {
           'x-user-id': user.id
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        toast.error('Failed to fetch performance data');
+        throw error;
+      }
       return data;
     },
-    enabled: !!currentParams.domain && !!user?.id
+    enabled: !!currentDomain && !!user?.id
   });
 
-  const totalPages = Math.ceil((data?.rows?.length || 0) / 100);
-  const currentPage = parseInt(searchParams.get('page') || '1');
-  const start = (currentPage - 1) * 100;
-  const end = start + 100;
-  const currentData = data?.rows?.slice(start, end) || [];
+  const handleDomainChange = (domain: string) => {
+    setSearchParams(prev => {
+      prev.set('domain', domain);
+      return prev;
+    });
+  };
 
   const handleExport = () => {
     if (!data?.rows) return;
@@ -89,53 +93,42 @@ export function GoogleSearchConsolePerformance() {
     saveAs(blob, `gsc-performance-${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
-  const handleDomainChange = (domain: string) => {
-    // Handle domain change logic here
-  };
-
-  const handleSelectAll = () => {
-    if (selectedRows.size === currentData.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(currentData.map(item => item.keys[0])));
-    }
-  };
-
-  const handleSelectQuery = (query: string) => {
-    const newSelected = new Set(selectedRows);
-    if (newSelected.has(query)) {
-      newSelected.delete(query);
-    } else {
-      newSelected.add(query);
-    }
-    setSelectedRows(newSelected);
-  };
-
-  const handlePageChange = (page: number) => {
-    // Handle page change logic here
-  };
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Search Console Performance</h1>
+        <div className="bg-red-50 p-4 rounded-lg text-red-700">
+          {error instanceof Error ? error.message : 'Failed to load performance data'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Search Console Performance</h1>
       
-      {error ? (
-        <div className="bg-red-50 p-4 rounded-lg text-red-700">
-          {error instanceof Error ? error.message : 'Failed to load performance data'}
-        </div>
-      ) : isLoading ? (
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-          <div className="space-y-3">
-            {[...Array(10)].map((_, index) => (
-              <div key={index} className="h-4 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      {isLoadingDomains ? (
+        <div>Loading domains...</div>
+      ) : domains?.length === 0 ? (
+        <div className="bg-yellow-50 p-4 rounded-lg text-yellow-700">
+          No domains found. Please add a domain to Google Search Console.
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <div className="flex items-center space-x-4">
+              <select 
+                value={currentDomain || ''} 
+                onChange={(e) => handleDomainChange(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2"
+              >
+                {domains?.map((domain: any) => (
+                  <option key={domain.siteUrl} value={domain.siteUrl}>
+                    {domain.siteUrl}
+                  </option>
+                ))}
+              </select>
               <h2 className="text-lg font-semibold">
                 Results ({data?.rows?.length || 0})
               </h2>
@@ -171,25 +164,39 @@ export function GoogleSearchConsolePerformance() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {currentData.map((row, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.keys[0]}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.clicks}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.impressions}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(row.ctr * 100).toFixed(2)}%
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.position.toFixed(2)}
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center">
+                      Loading...
                     </td>
                   </tr>
-                ))}
+                ) : data?.rows?.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center">
+                      No data available
+                    </td>
+                  </tr>
+                ) : (
+                  data?.rows?.map((row: any, index: number) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {row.keys[0]}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {row.clicks}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {row.impressions}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {(row.ctr * 100).toFixed(2)}%
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {row.position.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
