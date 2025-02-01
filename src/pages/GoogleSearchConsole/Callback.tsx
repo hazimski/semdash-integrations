@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../config/supabase';
 
 export function GoogleSearchConsoleCallback() {
   const navigate = useNavigate();
