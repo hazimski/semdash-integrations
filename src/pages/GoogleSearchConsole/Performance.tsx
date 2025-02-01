@@ -135,6 +135,34 @@ export function GoogleSearchConsolePerformance() {
     navigate(`/google-search-console/performance/${encodeURIComponent(newDomain)}`);
   };
 
+  const handleSelectAll = () => {
+    if (dimensionData) {
+      if (selectedQueries.size === dimensionData.length) {
+        setSelectedQueries(new Set());
+      } else {
+        setSelectedQueries(new Set(dimensionData.map(item => item.key)));
+      }
+    }
+  };
+
+  const handleSelectQuery = (key: string) => {
+    const newSelectedQueries = new Set(selectedQueries);
+    if (selectedQueries.has(key)) {
+      newSelectedQueries.delete(key);
+    } else {
+      newSelectedQueries.add(key);
+    }
+    setSelectedQueries(newSelectedQueries);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (activeDimension === 'page') {
+      setCurrentPagesPage(newPage);
+    } else {
+      setCurrentPage(newPage);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
