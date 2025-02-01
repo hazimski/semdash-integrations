@@ -82,6 +82,12 @@ import { PPAResults } from './pages/PPA/Results';
 import { Performance } from './pages/Performance';
 import { PerformanceResults } from './pages/Performance/Results';
 
+// Google Search Console
+import { GoogleSearchConsole } from './pages/GoogleSearchConsole';
+import { GoogleSearchConsoleCallback } from './pages/GoogleSearchConsole/Callback';
+import { GoogleSearchConsoleDomains } from './pages/GoogleSearchConsole/Domains';
+import { GoogleSearchConsolePerformance } from './pages/GoogleSearchConsole/Performance';
+
 // Create Query Client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,13 +128,11 @@ export default function App() {
                       <DomainSearch />
                     </ProtectedRoute>
                   } />
-<Route path="/roadmap" element={
-  <ProtectedRoute>
-    <Roadmap />
-  </ProtectedRoute>
-} />
-
-
+                  <Route path="/roadmap" element={
+                    <ProtectedRoute>
+                      <Roadmap />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/overview/results" element={
                     <ProtectedRoute>
                       <DomainOverview />
@@ -362,12 +366,34 @@ export default function App() {
                       <CompetitorAnalysisResults />
                     </ProtectedRoute>
                   } />
-<Route path="/maps-checker" element={
-            <ProtectedRoute><MapsChecker /></ProtectedRoute>
-          } />
-          <Route path="/maps-checker/results" element={
-            <ProtectedRoute><MapsCheckerResults /></ProtectedRoute>
-          } />
+                  <Route path="/maps-checker" element={
+                    <ProtectedRoute><MapsChecker /></ProtectedRoute>
+                  } />
+                  <Route path="/maps-checker/results" element={
+                    <ProtectedRoute><MapsCheckerResults /></ProtectedRoute>
+                  } />
+                  {/* Google Search Console */}
+                  <Route path="/google-search-console" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsole />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/callback" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsoleCallback />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/domains" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsoleDomains />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/performance/:domain" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsolePerformance />
+                    </ProtectedRoute>
+                  } />
+
                   {/* Account */}
                   <Route path="/settings" element={
                     <ProtectedRoute>

@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get user's Google tokens
+    // Get user's Google token
     const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
       .select('google_access_token')
@@ -28,22 +28,20 @@ serve(async (req) => {
 
     if (settingsError) throw settingsError
 
-    const endDate = new Date()
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Fetch performance data from Google Search Console
     const performanceResponse = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${settings.google_access_token}`,
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${settings.google_access_token}`,
         },
         body: JSON.stringify({
           startDate: startDate.toISOString().split('T')[0],
-          endDate: endDate.toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
           dimensions: ['date'],
         }),
       }

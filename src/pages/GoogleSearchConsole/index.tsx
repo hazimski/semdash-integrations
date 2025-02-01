@@ -6,7 +6,6 @@ export function GoogleSearchConsole() {
   const navigate = useNavigate();
   
   const handleGoogleAuth = async () => {
-    // TODO: Implement Google OAuth flow
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${window.location.origin}/google-search-console/callback&response_type=code&scope=https://www.googleapis.com/auth/webmasters.readonly&access_type=offline`;
   };
 
