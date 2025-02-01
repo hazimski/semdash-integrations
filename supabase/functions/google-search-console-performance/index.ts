@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { siteUrl, days } = await req.json()
+    const { siteUrl, days, dimension = 'query' } = await req.json()
     
     const userId = req.headers.get('x-user-id')
     if (!userId) {
@@ -26,7 +26,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get user's Google token
     const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
       .select('google_access_token')
@@ -58,8 +57,8 @@ serve(async (req) => {
         body: JSON.stringify({
           startDate: startDate.toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
-          dimensions: ['date'],
-          rowLimit: 500,
+          dimensions: [dimension],
+          rowLimit: 1000,
           aggregationType: 'auto'
         }),
       }
@@ -73,9 +72,9 @@ serve(async (req) => {
 
     const performance = await performanceResponse.json()
     
-    // Transform the data to match Google Search Console format
+    // Transform the data to match Google Search Console format exactly
     const transformedData = performance.rows?.map((row: any) => ({
-      date: row.keys[0],
+      key: row.keys[0],
       clicks: Math.round(row.clicks || 0),
       impressions: Math.round(row.impressions || 0),
       ctr: parseFloat(((row.ctr || 0) * 100).toFixed(2)),
