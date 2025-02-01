@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PerformanceData {
   key: string;
@@ -19,6 +20,8 @@ export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
   const [dateRange, setDateRange] = useState('28');
   const [activeDimension, setActiveDimension] = useState<Dimension>('query');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const { user } = useAuth();
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
@@ -66,6 +69,15 @@ export function GoogleSearchConsolePerformance() {
   });
 
   const isLoading = timeSeriesLoading || dimensionLoading;
+  const totalItems = dimensionData?.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = dimensionData?.slice(startIndex, endIndex) || [];
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -182,6 +194,24 @@ export function GoogleSearchConsolePerformance() {
             </div>
 
             <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm text-gray-600">
+                  {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600">Rows per page:</span>
+                  <select 
+                    className="border rounded px-2 py-1"
+                    value={itemsPerPage}
+                    onChange={(e) => setCurrentPage(1)}
+                  >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                </div>
+              </div>
+
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-gray-500">
@@ -193,7 +223,7 @@ export function GoogleSearchConsolePerformance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dimensionData?.map((item: PerformanceData) => (
+                  {currentData.map((item: PerformanceData) => (
                     <tr key={item.key} className="border-t">
                       <td className="py-4">{item.key}</td>
                       <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
@@ -204,6 +234,28 @@ export function GoogleSearchConsolePerformance() {
                   ))}
                 </tbody>
               </table>
+
+              <div className="flex justify-between items-center mt-4">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </>
