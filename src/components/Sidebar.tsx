@@ -1,12 +1,36 @@
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {MapPinned,CircleFadingPlus, Cog, Map, Boxes, Home, Network, Link2, Search, Layers, BarChart2, Users, FileText, KeySquare, Sprout, Link as LinkIcon, History, Settings, LogOut, HelpCircle, Share, List, CreditCard, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ShareEarn } from './ShareEarn';
+import { supabase } from '../config/supabase';
+import { useQuery } from '@tanstack/react-query';
 
 export function Sidebar() {
   const { logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
+
+  // Query to check if user has valid Google Search Console token
+  const { data: userSettings } = useQuery({
+    queryKey: ['user-settings'],
+    queryFn: async () => {
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('google_access_token, google_token_expiry')
+        .single();
+      return settings;
+    }
+  });
+
+  const handleGoogleSearchConsoleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (userSettings?.google_access_token && new Date(userSettings.google_token_expiry) > new Date()) {
+      navigate('/google-search-console/domains');
+    } else {
+      navigate('/google-search-console');
+    }
+  };
 
   const sections = [
     {
@@ -51,7 +75,12 @@ export function Sidebar() {
       items: [
         { icon: Boxes, label: 'Keyword Clustering', path: '/keyword-clustering' },
         { icon: Map, label: 'Topical Map', path: '/topical-map' },
-        { icon: BarChart2, label: 'Search Console', path: '/google-search-console/domains' }
+        { 
+          icon: BarChart2, 
+          label: 'Search Console', 
+          path: '/google-search-console',
+          onClick: handleGoogleSearchConsoleClick
+        }
       ]
     },
     {
@@ -101,32 +130,46 @@ export function Sidebar() {
             <ul className="space-y-1">
               {section.items.map((item) => (
                 <li key={item.path}>
-                  <NavLink
-                    to={item.path}
-                    className={({ isActive }) =>
-                      `flex items-center ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium rounded-lg transition-colors relative group ${
-                        isActive 
-                          ? 'bg-[#dbf3ff] text-[#0081dd] dark:bg-blue-900/50 dark:text-blue-200 shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)]' 
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`
-                    }
-                  >
-                    <item.icon className={`w-5 h-5 ${isCollapsed ? '' : 'mr-3'}`} />
-                    {!isCollapsed && item.label}
-                    {isCollapsed && (
-                      <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 whitespace-nowrap">
-                        {item.label}
-                      </div>
-                    )}
-                  </NavLink>
+                  {item.onClick ? (
+                    <a
+                      href={item.path}
+                      onClick={item.onClick}
+                      className={`flex items-center ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium rounded-lg transition-colors relative group text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800`}
+                    >
+                      <item.icon className={`w-5 h-5 ${isCollapsed ? '' : 'mr-3'}`} />
+                      {!isCollapsed && item.label}
+                      {isCollapsed && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 whitespace-nowrap">
+                          {item.label}
+                        </div>
+                      )}
+                    </a>
+                  ) : (
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `flex items-center ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium rounded-lg transition-colors relative group ${
+                          isActive 
+                            ? 'bg-[#dbf3ff] text-[#0081dd] dark:bg-blue-900/50 dark:text-blue-200 shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)]' 
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`
+                      }
+                    >
+                      <item.icon className={`w-5 h-5 ${isCollapsed ? '' : 'mr-3'}`} />
+                      {!isCollapsed && item.label}
+                      {isCollapsed && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 whitespace-nowrap">
+                          {item.label}
+                        </div>
+                      )}
+                    </NavLink>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
         ))}
       </nav>
-
-
     </div>
   );
 }

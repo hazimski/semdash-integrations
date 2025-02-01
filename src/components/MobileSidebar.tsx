@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { X,Map, Boxes, Home, Network, Link2, Search, Layers, BarChart2, Users, FileText, KeySquare, Sprout, Link as LinkIcon, History, Settings, LogOut, HelpCircle, Share, List, CreditCard, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../config/supabase';
+import { useQuery } from '@tanstack/react-query';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -10,6 +12,29 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Query to check if user has valid Google Search Console token
+  const { data: userSettings } = useQuery({
+    queryKey: ['user-settings'],
+    queryFn: async () => {
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('google_access_token, google_token_expiry')
+        .single();
+      return settings;
+    }
+  });
+
+  const handleGoogleSearchConsoleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onClose();
+    if (userSettings?.google_access_token && new Date(userSettings.google_token_expiry) > new Date()) {
+      navigate('/google-search-console/domains');
+    } else {
+      navigate('/google-search-console');
+    }
+  };
 
   // Close sidebar when clicking outside
   useEffect(() => {
@@ -74,17 +99,23 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
         { icon: Link2, label: 'Backlinks', path: '/botox' },
         { icon: LinkIcon, label: 'Referring Domains', path: '/referring-domains' },
         { icon: Layers, label: 'Pages By Links', path: '/pages-by-links' },
-        { icon: Layers, label: 'Bulk', path: '/backlinks' }
       ]
     },
     {
       title: 'SEO Tools',
       items: [
         { icon: Boxes, label: 'Keyword Clustering', path: '/keyword-clustering' },
-        { icon: Map, label: 'Topical Map', path: '/topical-map' }
+        { icon: Map, label: 'Topical Map', path: '/topical-map' },
+        { 
+          icon: BarChart2, 
+          label: 'Search Console', 
+          path: '/google-search-console',
+          onClick: handleGoogleSearchConsoleClick
+        }
       ]
     }
   ];
+
   return (
     <>
       {/* Backdrop */}
@@ -128,20 +159,31 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                 <ul className="space-y-1">
                   {section.items.map((item) => (
                     <li key={item.path}>
-                      <NavLink
-                        to={item.path}
-                        onClick={onClose}
-                        className={({ isActive }) =>
-                          `flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                            isActive 
-                              ? 'bg-[#dbf3ff] text-[#0081dd] shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)]' 
-                              : 'text-gray-700 hover:bg-gray-100'
-                          }`
-                        }
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        {item.label}
-                      </NavLink>
+                      {item.onClick ? (
+                        <a
+                          href={item.path}
+                          onClick={item.onClick}
+                          className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+                        >
+                          <item.icon className="w-5 h-5 mr-3" />
+                          {item.label}
+                        </a>
+                      ) : (
+                        <NavLink
+                          to={item.path}
+                          onClick={onClose}
+                          className={({ isActive }) =>
+                            `flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              isActive 
+                                ? 'bg-[#dbf3ff] text-[#0081dd] shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)]' 
+                                : 'text-gray-700 hover:bg-gray-100'
+                            }`
+                          }
+                        >
+                          <item.icon className="w-5 h-5 mr-3" />
+                          {item.label}
+                        </NavLink>
+                      )}
                     </li>
                   ))}
                 </ul>
