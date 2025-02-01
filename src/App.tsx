@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { CreditsProvider } from './contexts/CreditsContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import Roadmap from './pages/Roadmap';  // <-- Correct import path
+import Roadmap from './pages/Roadmap';
 
 // Components
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -122,6 +122,20 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/overview" replace />} />
                 
                 <Route element={<Layout />}>
+                  {/* Settings */}
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Subscription */}
+                  <Route path="/subscription" element={
+                    <ProtectedRoute>
+                      <Subscription />
+                    </ProtectedRoute>
+                  } />
+
                   {/* Google Search Console */}
                   <Route path="/google-search-console" element={
                     <ProtectedRoute>
@@ -314,6 +328,16 @@ export default function App() {
                       <LocalSerpResults />
                     </ProtectedRoute>
                   } />
+                  <Route path="/maps-checker" element={
+                    <ProtectedRoute>
+                      <MapsChecker />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/maps-checker/results" element={
+                    <ProtectedRoute>
+                      <MapsCheckerResults />
+                    </ProtectedRoute>
+                  } />
 
                   {/* Pages Analysis */}
                   <Route path="/pages" element={
@@ -387,12 +411,6 @@ export default function App() {
                     <ProtectedRoute>
                       <CompetitorAnalysisResults />
                     </ProtectedRoute>
-                  } />
-                  <Route path="/maps-checker" element={
-                    <ProtectedRoute><MapsChecker /></ProtectedRoute>
-                  } />
-                  <Route path="/maps-checker/results" element={
-                    <ProtectedRoute><MapsCheckerResults /></ProtectedRoute>
                   } />
                 </Route>
 
