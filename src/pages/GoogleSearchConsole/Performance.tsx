@@ -175,7 +175,7 @@ export function GoogleSearchConsolePerformance() {
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
           <p className="text-3xl font-bold">
-            {calculateAverage(timeSeriesData?.rows, 'ctr').toFixed(2)}%
+            {(calculateAverage(timeSeriesData?.rows, 'ctr') * 100).toFixed(2)}%
           </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
@@ -191,181 +191,152 @@ export function GoogleSearchConsolePerformance() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
-              <p className="text-3xl font-bold">
-                {calculateTotal(timeSeriesData?.rows, 'clicks').toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
-              <p className="text-3xl font-bold">
-                {calculateTotal(timeSeriesData?.rows, 'impressions').toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
-              <p className="text-3xl font-bold">
-                {calculateAverage(timeSeriesData?.rows, 'ctr').toFixed(2)}%
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Average Position</h3>
-              <p className="text-3xl font-bold">
-                {calculateAverage(timeSeriesData?.rows, 'position').toFixed(1)}
-              </p>
-            </div>
+        <div className="bg-white rounded-lg shadow">
+          {selectedQueries.size > 0 && (
+            <KeywordListActions
+              selectedKeywords={selectedQueries}
+              onClearSelection={() => setSelectedQueries(new Set())}
+              locationName={currentParams.location}
+              languageName={currentParams.language}
+              keywords={dimensionData?.data?.filter(item => selectedQueries.has(item.key)).map(item => ({
+                keyword: item.key,
+                searchVolume: item.impressions,
+                cpc: '-',
+                keywordDifficulty: '-',
+                intent: 'informational',
+                source: 'GSC'
+              }))}
+            />
+          )}
+
+          <div className="border-b">
+            <nav className="flex">
+              <button
+                onClick={() => setActiveDimension('query')}
+                className={`px-6 py-4 text-sm font-medium ${activeDimension === 'query' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                Queries
+              </button>
+              <button
+                onClick={() => setActiveDimension('page')}
+                className={`px-6 py-4 text-sm font-medium ${activeDimension === 'page' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                Pages
+              </button>
+              <button
+                onClick={() => setActiveDimension('country')}
+                className={`px-6 py-4 text-sm font-medium ${activeDimension === 'country' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                Countries
+              </button>
+              <button
+                onClick={() => setActiveDimension('device')}
+                className={`px-6 py-4 text-sm font-medium ${activeDimension === 'device' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                Devices
+              </button>
+              <button
+                onClick={() => setActiveDimension('searchAppearance')}
+                className={`px-6 py-4 text-sm font-medium ${activeDimension === 'searchAppearance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+              >
+                Search Appearance
+              </button>
+            </nav>
           </div>
 
-          <div className="bg-white rounded-lg shadow">
-            {selectedQueries.size > 0 && (
-              <KeywordListActions
-                selectedKeywords={selectedQueries}
-                onClearSelection={() => setSelectedQueries(new Set())}
-                locationName={currentParams.location}
-                languageName={currentParams.language}
-                keywords={dimensionData?.data?.filter(item => selectedQueries.has(item.key)).map(item => ({
-                  keyword: item.key,
-                  searchVolume: item.impressions,
-                  cpc: '-',
-                  keywordDifficulty: '-',
-                  intent: 'informational',
-                  source: 'GSC'
-                }))}
-              />
-            )}
-
-            <div className="border-b">
-              <nav className="flex">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-sm text-gray-600">
+                Showing {Math.min((getCurrentPage() - 1) * ITEMS_PER_PAGE + 1, totalItems)}-{Math.min(getCurrentPage() * ITEMS_PER_PAGE, totalItems)} of {totalItems.toLocaleString()} total results
+              </div>
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={() => setActiveDimension('query')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'query' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                  onClick={handleExport}
+                  disabled={!dimensionData?.data?.length}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Queries
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
                 </button>
-                <button
-                  onClick={() => setActiveDimension('page')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'page' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Pages
-                </button>
-                <button
-                  onClick={() => setActiveDimension('country')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'country' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Countries
-                </button>
-                <button
-                  onClick={() => setActiveDimension('device')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'device' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Devices
-                </button>
-                <button
-                  onClick={() => setActiveDimension('searchAppearance')}
-                  className={`px-6 py-4 text-sm font-medium ${activeDimension === 'searchAppearance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
-                >
-                  Search Appearance
-                </button>
-              </nav>
+              </div>
             </div>
 
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-sm text-gray-600">
-                  Showing {(getCurrentPage() - 1) * ITEMS_PER_PAGE + 1}-{Math.min(getCurrentPage() * ITEMS_PER_PAGE, totalItems)} of {totalItems} total results
-                </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={handleExport}
-                    disabled={!dimensionData?.data?.length}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </button>
-                </div>
-              </div>
-
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500">
-                    <th className="pb-4 pr-4">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-sm text-gray-500">
+                  <th className="pb-4 pr-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedQueries.size === dimensionData?.data?.length}
+                      onChange={() => {
+                        if (selectedQueries.size === dimensionData?.data?.length) {
+                          setSelectedQueries(new Set());
+                        } else {
+                          setSelectedQueries(new Set(dimensionData?.data?.map(item => item.key) || []));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
+                  <th className="pb-4">{activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance'}</th>
+                  <th className="pb-4 text-right">Clicks</th>
+                  <th className="pb-4 text-right">Impressions</th>
+                  <th className="pb-4 text-right">CTR</th>
+                  <th className="pb-4 text-right">Position</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentData.map((item: any) => (
+                  <tr key={item.key} className="border-t">
+                    <td className="py-4 pr-4">
                       <input
                         type="checkbox"
-                        checked={selectedQueries.size === dimensionData?.data?.length}
+                        checked={selectedQueries.has(item.key)}
                         onChange={() => {
-                          if (selectedQueries.size === dimensionData?.data?.length) {
-                            setSelectedQueries(new Set());
+                          const newSelected = new Set(selectedQueries);
+                          if (newSelected.has(item.key)) {
+                            newSelected.delete(item.key);
                           } else {
-                            setSelectedQueries(new Set(dimensionData?.data?.map(item => item.key) || []));
+                            newSelected.add(item.key);
                           }
+                          setSelectedQueries(newSelected);
                         }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                    </th>
-                    <th className="pb-4">{activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance'}</th>
-                    <th className="pb-4 text-right">Clicks</th>
-                    <th className="pb-4 text-right">Impressions</th>
-                    <th className="pb-4 text-right">CTR</th>
-                    <th className="pb-4 text-right">Position</th>
+                    </td>
+                    <td className="py-4">{item.key}</td>
+                    <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
+                    <td className="py-4 text-right">{item.impressions.toLocaleString()}</td>
+                    <td className="py-4 text-right">{(item.ctr * 100).toFixed(2)}%</td>
+                    <td className="py-4 text-right">{item.position.toFixed(1)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {currentData.map((item: any) => (
-                    <tr key={item.key} className="border-t">
-                      <td className="py-4 pr-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedQueries.has(item.key)}
-                          onChange={() => {
-                            const newSelected = new Set(selectedQueries);
-                            if (newSelected.has(item.key)) {
-                              newSelected.delete(item.key);
-                            } else {
-                              newSelected.add(item.key);
-                            }
-                            setSelectedQueries(newSelected);
-                          }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-4">{item.key}</td>
-                      <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
-                      <td className="py-4 text-right">{item.impressions.toLocaleString()}</td>
-                      <td className="py-4 text-right">{(item.ctr * 100).toFixed(2)}%</td>
-                      <td className="py-4 text-right">{item.position.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
 
-              <div className="flex justify-between items-center mt-4">
-                <div className="text-sm text-gray-600">
-                  Page {getCurrentPage()} of {totalPages}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handlePageChange(getCurrentPage() - 1)}
-                    disabled={getCurrentPage() === 1}
-                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handlePageChange(getCurrentPage() + 1)}
-                    disabled={getCurrentPage() === totalPages}
-                    className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-600">
+                Page {getCurrentPage()} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePageChange(getCurrentPage() - 1)}
+                  disabled={getCurrentPage() === 1}
+                  className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(getCurrentPage() + 1)}
+                  disabled={getCurrentPage() === totalPages}
+                  className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
