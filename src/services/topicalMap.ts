@@ -127,6 +127,9 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
       return result;
     } catch (error) {
       console.error('Error generating topical map:', error);
+      if (error instanceof Error && error.message === 'OpenAI API key not found') {
+        throw error; // Re-throw API key error to handle it in the UI
+      }
       throw new Error('Failed to generate topical map');
     } finally {
       // Clean up pending request
@@ -141,12 +144,16 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
 }
 
 function validateTopicalMap(map: any): asserts map is TopicalMap {
-  if (!map.categories || !Array.isArray(map.categories)) {
+  if (!map || typeof map !== 'object') {
+    throw new Error('Invalid map structure: must be an object');
+  }
+
+  if (!Array.isArray(map.categories)) {
     throw new Error('Invalid map structure: missing categories array');
   }
 
   if (map.categories.length !== 10) {
-    throw new Error('Invalid map structure: must have exactly 10 categories');
+    throw new Error(`Invalid map structure: must have exactly 10 categories (found ${map.categories.length})`);
   }
 
   map.categories.forEach((category: any, index: number) => {
@@ -154,8 +161,12 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
       throw new Error(`Invalid category name at index ${index}`);
     }
 
-    if (!category.pages || !Array.isArray(category.pages) || category.pages.length !== 5) {
-      throw new Error(`Category "${category.name}" must have exactly 5 pages`);
+    if (!Array.isArray(category.pages)) {
+      throw new Error(`Category "${category.name}" is missing pages array`);
+    }
+
+    if (category.pages.length !== 5) {
+      throw new Error(`Category "${category.name}" must have exactly 5 pages (found ${category.pages.length})`);
     }
 
     category.pages.forEach((page: any, pageIndex: number) => {
@@ -164,7 +175,7 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
       }
 
       if (!['informational', 'commercial', 'transactional', 'navigational'].includes(page.intent)) {
-        throw new Error(`Invalid intent for page "${page.title}" in category "${category.name}"`);
+        throw new Error(`Invalid intent "${page.intent}" for page "${page.title}" in category "${category.name}"`);
       }
     });
   });
