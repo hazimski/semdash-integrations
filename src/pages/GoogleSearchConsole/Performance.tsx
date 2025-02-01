@@ -17,13 +17,12 @@ interface PerformanceData {
   position: number;
 }
 
-type Dimension = 'query' | 'page' | 'country' | 'device' | 'searchAppearance';
-
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
   const [dateRange, setDateRange] = useState('28');
-  const [activeDimension, setActiveDimension] = useState<Dimension>('query');
+  const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentPagesPage, setCurrentPagesPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
@@ -81,7 +80,12 @@ export function GoogleSearchConsolePerformance() {
   const isLoading = timeSeriesLoading || dimensionLoading;
   const totalItems = dimensionData?.length || 0;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  
+  const getCurrentPage = () => {
+    return activeDimension === 'page' ? currentPagesPage : currentPage;
+  };
+
+  const startIndex = (getCurrentPage() - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = dimensionData?.slice(startIndex, endIndex) || [];
 
@@ -93,7 +97,7 @@ export function GoogleSearchConsolePerformance() {
       : dimensionData;
 
     const headers = [
-      'Query',
+      activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance',
       'Clicks',
       'Impressions',
       'CTR',
@@ -106,13 +110,13 @@ export function GoogleSearchConsolePerformance() {
         item.key,
         item.clicks,
         item.impressions,
-        `${(item.ctr * 100).toFixed(2)}%`,
+        item.ctr,
         item.position.toFixed(1)
       ].join(','))
     ].join('\n');
 
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `gsc_queries_${domain}_${dateRange}days.csv`);
+    saveAs(blob, `gsc_${activeDimension}_${domain}_${dateRange}days.csv`);
     toast.success('CSV file exported successfully');
   };
 
@@ -135,7 +139,11 @@ export function GoogleSearchConsolePerformance() {
   };
 
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
+    if (activeDimension === 'page') {
+      setCurrentPagesPage(newPage);
+    } else {
+      setCurrentPage(newPage);
+    }
   };
 
   return (
@@ -210,7 +218,8 @@ export function GoogleSearchConsolePerformance() {
                   searchVolume: item.impressions,
                   cpc: 0,
                   keywordDifficulty: 0,
-                  intent: 'informational'
+                  intent: 'informational',
+                  source: 'GSC'
                 }))}
               />
             )}
@@ -299,7 +308,7 @@ export function GoogleSearchConsolePerformance() {
                       <td className="py-4">{item.key}</td>
                       <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
                       <td className="py-4 text-right">{item.impressions.toLocaleString()}</td>
-                      <td className="py-4 text-right">{(item.ctr * 100).toFixed(2)}%</td>
+                      <td className="py-4 text-right">{(item.ctr).toFixed(2)}%</td>
                       <td className="py-4 text-right">{item.position.toFixed(1)}</td>
                     </tr>
                   ))}
@@ -308,19 +317,19 @@ export function GoogleSearchConsolePerformance() {
 
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
-                  Page {currentPage} of {totalPages}
+                  Page {getCurrentPage()} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(getCurrentPage() - 1)}
+                    disabled={getCurrentPage() === 1}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(getCurrentPage() + 1)}
+                    disabled={getCurrentPage() === totalPages}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronRight className="w-5 h-5" />
