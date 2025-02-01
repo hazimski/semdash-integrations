@@ -1,8 +1,10 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { Unlink } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface Domain {
   siteUrl: string;
@@ -12,6 +14,7 @@ interface Domain {
 export function GoogleSearchConsoleDomains() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: domains, isLoading, error } = useQuery({
     queryKey: ['gsc-domains'],
@@ -31,6 +34,31 @@ export function GoogleSearchConsoleDomains() {
     },
     enabled: !!user?.id
   });
+
+  const handleDisconnect = async () => {
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expiry: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Invalidate the domains query to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['gsc-domains'] });
+      
+      toast.success('Successfully disconnected from Google Search Console');
+      navigate('/google-search-console');
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      toast.error('Failed to disconnect from Google Search Console');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -52,7 +80,16 @@ export function GoogleSearchConsoleDomains() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-8">Connected Domains</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">Connected Domains</h1>
+        <button
+          onClick={handleDisconnect}
+          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+        >
+          <Unlink className="w-4 h-4" />
+          Disconnect Google
+        </button>
+      </div>
       
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
