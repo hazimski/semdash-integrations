@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { getUserSettings, updateOpenAIKey } from '../../services/settings';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { getUserSettings } from '../../services/settings';
 
 interface AIAnalysisProps {
   isOpen: boolean;
@@ -24,22 +24,6 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
   const [analysis, setAnalysis] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      const settings = await getUserSettings();
-      setHasApiKey(!!settings?.openai_api_key);
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
 
   useEffect(() => {
     let messageInterval: NodeJS.Timeout;
@@ -57,30 +41,11 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
     };
   }, [isLoading]);
 
-  const handleSaveApiKey = async () => {
-    if (!apiKey.startsWith('sk-')) {
-      toast.error('Invalid API key format. It should start with "sk-"');
-      return;
-    }
-
-    try {
-      await updateOpenAIKey(apiKey);
-      setHasApiKey(true);
-      setShowApiKeyDialog(false);
-      toast.success('API key saved successfully');
-      generateAnalysis();
-    } catch (error) {
-      toast.error('Failed to save API key');
-    }
-  };
-
   useEffect(() => {
-    if (isOpen && data && !hasApiKey) {
-      setShowApiKeyDialog(true);
-    } else if (isOpen && data && hasApiKey && !analysis) {
+    if (isOpen && data) {
       generateAnalysis();
     }
-  }, [isOpen, data, hasApiKey]);
+  }, [isOpen, data]);
 
   const generateAnalysis = async () => {
     if (!data) return;
@@ -91,8 +56,7 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
       const settings = await getUserSettings();
       
       if (!settings?.openai_api_key) {
-        setShowApiKeyDialog(true);
-        return;
+        throw new Error('OpenAI API key not found');
       }
 
       const response = await axios.post(
@@ -126,13 +90,7 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
       setAnalysis(content);
     } catch (error: any) {
       console.error('Error generating analysis:', error);
-      
-      if (error.response?.data?.error?.code === 'rate_limit_exceeded') {
-        toast.error(error.response.data.error.message);
-      } else {
-        toast.error('Failed to generate analysis');
-      }
-      
+      toast.error('Failed to generate analysis');
       onClose();
     } finally {
       setIsLoading(false);
@@ -155,48 +113,7 @@ export function AIAnalysis({ isOpen, onClose, data }: AIAnalysisProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {showApiKeyDialog ? (
-            <div className="bg-white p-6 rounded-lg">
-              <div className="mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  OpenAI API Key Required
-                </h3>
-                <p className="text-sm text-gray-500 mt-2">
-                  To use AI Analysis, you need to provide your OpenAI API key. This key will be securely stored and used only for generating SEO recommendations.
-                </p>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveApiKey}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                  >
-                    Save API Key
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : isLoading ? (
+          {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full space-y-4">
               <div className="w-32 h-32">
                 <DotLottieReact

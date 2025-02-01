@@ -18,6 +18,24 @@ export async function getUserSettings(): Promise<UserSettings | null> {
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
+    
+    // If no user settings found, try to get system API key
+    if (!data?.openai_api_key) {
+      const { data: systemSettings, error: systemError } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'openai_api_key')
+        .single();
+      
+      if (!systemError && systemSettings) {
+        return {
+          openai_api_key: systemSettings.value,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Error getting user settings:', error);
