@@ -9,18 +9,8 @@ const resultCache = new Map<string, {
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export const SYSTEM_PROMPT = `You are an SEO expert. Generate a topical map as a JSON object with EXACTLY:
-- 10 categories (no more, no less)
-- 5 pages per category (no more, no less)
-- Each page must have a title and intent
-
-CRITICAL REQUIREMENTS:
-- Return EXACTLY 10 categories
-- Each category MUST have EXACTLY 5 pages
-- Do not include any explanatory text
-- Return only the JSON object
-- Ensure the JSON structure is complete and valid
-- Do not truncate the response
+export const SYSTEM_PROMPT = `You are an SEO expert. Generate a topical map as a JSON object with categories and pages.
+Each category should have pages with titles and intents.
 
 Required JSON structure:
 {
@@ -39,14 +29,11 @@ Required JSON structure:
 
 export const createUserPrompt = (keyword: string): string => `Create a topical map for "${keyword}".
 
-STRICT REQUIREMENTS:
-1. EXACTLY 10 categories (no more, no less)
-2. EXACTLY 5 pages per category (no more, no less)
-3. Each page must have:
+Each page must have:
    - A clear, specific title
    - One of these intents: informational, commercial, transactional, navigational
 
-Return ONLY the JSON object with EXACTLY the required number of categories and pages.`;
+Return ONLY the JSON object.`;
 
 export interface TopicalMapPage {
   title: string;
@@ -82,7 +69,7 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
     try {
       const settings = await getUserSettings();
       if (!settings?.openai_api_key) {
-        throw new Error('OpenAI API key not found');
+        throw new Error('API_KEY_REQUIRED');
       }
 
       const response = await axios.post(
@@ -126,6 +113,9 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
 
       return result;
     } catch (error) {
+      if (error instanceof Error && error.message === 'API_KEY_REQUIRED') {
+        throw error;
+      }
       console.error('Error generating topical map:', error);
       throw new Error('Failed to generate topical map');
     } finally {
@@ -145,17 +135,14 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
     throw new Error('Invalid map structure: missing categories array');
   }
 
-  if (map.categories.length !== 10) {
-    throw new Error('Invalid map structure: must have exactly 10 categories');
-  }
-
   map.categories.forEach((category: any, index: number) => {
     if (!category.name || typeof category.name !== 'string') {
       throw new Error(`Invalid category name at index ${index}`);
     }
 
-    if (!category.pages || !Array.isArray(category.pages) || category.pages.length !== 5) {
-      throw new Error(`Category "${category.name}" must have exactly 5 pages`);
+    if (!category.pages || !Array.isArray(category.pages)) {
+      category.pages = []; // Initialize empty pages array if missing
+      return;
     }
 
     category.pages.forEach((page: any, pageIndex: number) => {
@@ -164,7 +151,8 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
       }
 
       if (!['informational', 'commercial', 'transactional', 'navigational'].includes(page.intent)) {
-        throw new Error(`Invalid intent for page "${page.title}" in category "${category.name}"`);
+        // Default to informational if intent is invalid
+        page.intent = 'informational';
       }
     });
   });
