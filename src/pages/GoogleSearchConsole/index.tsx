@@ -10,7 +10,7 @@ export function GoogleSearchConsole() {
     const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
     
     const params = new URLSearchParams({
-      client_id: '1012072796878-ufqj8s88vto2tnp0vj3g7vv9qk7n8l1q.apps.googleusercontent.com', // Public client ID is fine to be exposed
+      client_id: '875375764767-5v7sebv1p0vkecpku25ab6oafb8lpmo8.apps.googleusercontent.com',
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: scope,
