@@ -122,6 +122,28 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/overview" replace />} />
                 
                 <Route element={<Layout />}>
+                  {/* Google Search Console */}
+                  <Route path="/google-search-console" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsole />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/callback" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsoleCallback />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/domains" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsoleDomains />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/google-search-console/performance/:domain" element={
+                    <ProtectedRoute>
+                      <GoogleSearchConsolePerformance />
+                    </ProtectedRoute>
+                  } />
+
                   {/* Domain Analysis */}
                   <Route path="/overview" element={
                     <ProtectedRoute>
@@ -371,39 +393,6 @@ export default function App() {
                   } />
                   <Route path="/maps-checker/results" element={
                     <ProtectedRoute><MapsCheckerResults /></ProtectedRoute>
-                  } />
-                  {/* Google Search Console */}
-                  <Route path="/google-search-console" element={
-                    <ProtectedRoute>
-                      <GoogleSearchConsole />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/google-search-console/callback" element={
-                    <ProtectedRoute>
-                      <GoogleSearchConsoleCallback />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/google-search-console/domains" element={
-                    <ProtectedRoute>
-                      <GoogleSearchConsoleDomains />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/google-search-console/performance/:domain" element={
-                    <ProtectedRoute>
-                      <GoogleSearchConsolePerformance />
-                    </ProtectedRoute>
-                  } />
-
-                  {/* Account */}
-                  <Route path="/settings" element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/subscription" element={
-                    <ProtectedRoute>
-                      <Subscription />
-                    </ProtectedRoute>
                   } />
                 </Route>
 
