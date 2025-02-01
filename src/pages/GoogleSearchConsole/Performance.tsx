@@ -4,7 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, ListPlus } from 'lucide-react';
+import { KeywordListActions } from '../../components/keywords/KeywordListActions';
+import { toast } from 'react-hot-toast';
+import { saveAs } from 'file-saver';
 
 interface PerformanceData {
   key: string;
@@ -22,6 +25,7 @@ export function GoogleSearchConsolePerformance() {
   const [activeDimension, setActiveDimension] = useState<Dimension>('query');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
@@ -74,6 +78,55 @@ export function GoogleSearchConsolePerformance() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = dimensionData?.slice(startIndex, endIndex) || [];
+
+  const handleExport = () => {
+    if (!dimensionData?.length) return;
+
+    const dataToExport = selectedQueries.size > 0 
+      ? dimensionData.filter(item => selectedQueries.has(item.key))
+      : dimensionData;
+
+    const headers = [
+      'Query',
+      'Clicks',
+      'Impressions',
+      'CTR',
+      'Position'
+    ];
+
+    const csvData = [
+      headers.join(','),
+      ...dataToExport.map(item => [
+        item.key,
+        item.clicks,
+        item.impressions,
+        `${(item.ctr * 100).toFixed(2)}%`,
+        item.position.toFixed(1)
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `gsc_queries_${domain}_${dateRange}days.csv`);
+    toast.success('CSV file exported successfully');
+  };
+
+  const handleSelectAll = () => {
+    if (selectedQueries.size === dimensionData?.length) {
+      setSelectedQueries(new Set());
+    } else {
+      setSelectedQueries(new Set(dimensionData?.map(item => item.key) || []));
+    }
+  };
+
+  const handleSelectQuery = (query: string) => {
+    const newSelected = new Set(selectedQueries);
+    if (newSelected.has(query)) {
+      newSelected.delete(query);
+    } else {
+      newSelected.add(query);
+    }
+    setSelectedQueries(newSelected);
+  };
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
@@ -139,25 +192,23 @@ export function GoogleSearchConsolePerformance() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow mb-8">
-            <h3 className="text-lg font-semibold mb-4">Performance Over Time</h3>
-            <div className="h-96">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="key" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="clicks" stroke="#3b82f6" name="Clicks" />
-                  <Line yAxisId="right" type="monotone" dataKey="impressions" stroke="#7c3aed" name="Impressions" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
           <div className="bg-white rounded-lg shadow">
+            {selectedQueries.size > 0 && (
+              <KeywordListActions
+                selectedKeywords={selectedQueries}
+                onClearSelection={() => setSelectedQueries(new Set())}
+                locationName={currentParams.location}
+                languageName={currentParams.language}
+                keywords={dimensionData?.filter(item => selectedQueries.has(item.key)).map(item => ({
+                  keyword: item.key,
+                  searchVolume: item.impressions,
+                  cpc: 0,
+                  keywordDifficulty: 0,
+                  intent: 'informational'
+                }))}
+              />
+            )}
+
             <div className="border-b">
               <nav className="flex">
                 <button
@@ -199,22 +250,28 @@ export function GoogleSearchConsolePerformance() {
                   {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">Rows per page:</span>
-                  <select 
-                    className="border rounded px-2 py-1"
-                    value={itemsPerPage}
-                    onChange={(e) => setCurrentPage(1)}
+                  <button
+                    onClick={handleExport}
+                    disabled={!dimensionData?.length}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </button>
                 </div>
               </div>
 
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-gray-500">
+                    <th className="pb-4 pr-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedQueries.size === dimensionData?.length}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
                     <th className="pb-4">{activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance'}</th>
                     <th className="pb-4 text-right">Clicks</th>
                     <th className="pb-4 text-right">Impressions</th>
@@ -225,10 +282,18 @@ export function GoogleSearchConsolePerformance() {
                 <tbody>
                   {currentData.map((item: PerformanceData) => (
                     <tr key={item.key} className="border-t">
+                      <td className="py-4 pr-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedQueries.has(item.key)}
+                          onChange={() => handleSelectQuery(item.key)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="py-4">{item.key}</td>
                       <td className="py-4 text-right">{item.clicks.toLocaleString()}</td>
                       <td className="py-4 text-right">{item.impressions.toLocaleString()}</td>
-                      <td className="py-4 text-right">{item.ctr.toFixed(2)}%</td>
+                      <td className="py-4 text-right">{(item.ctr * 100).toFixed(2)}%</td>
                       <td className="py-4 text-right">{item.position.toFixed(1)}</td>
                     </tr>
                   ))}
