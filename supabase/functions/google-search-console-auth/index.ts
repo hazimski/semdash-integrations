@@ -13,6 +13,11 @@ serve(async (req) => {
 
   try {
     const { code, redirect_uri } = await req.json()
+    console.log('Received code and redirect_uri:', { code, redirect_uri })
+
+    if (!code) {
+      throw new Error('No authorization code provided')
+    }
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -30,28 +35,39 @@ serve(async (req) => {
     })
 
     const tokens = await tokenResponse.json()
+    console.log('Token exchange response:', tokens)
     
     if (tokens.error) {
       console.error('Token exchange error:', tokens)
       throw new Error(tokens.error_description || 'Failed to exchange code for tokens')
     }
 
-    // Store tokens in user_settings
+    // Get user info from the authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header')
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Store tokens in user_settings
     const { error: updateError } = await supabase
       .from('user_settings')
       .upsert({
-        user_id: req.headers.get('x-user-id'),
+        user_id: authHeader.replace('Bearer ', ''),
         google_access_token: tokens.access_token,
         google_refresh_token: tokens.refresh_token,
         google_token_expiry: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString()
       })
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Error updating user settings:', updateError)
+      throw updateError
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
