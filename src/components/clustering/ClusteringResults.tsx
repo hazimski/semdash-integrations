@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Key } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import { toast } from 'react-hot-toast';
@@ -11,6 +11,21 @@ interface ClusteringResultsProps {
 export function ClusteringResults({ clusters = {} }: ClusteringResultsProps) {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [apiKey, setApiKey] = useState('');
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      try {
+        const settings = await getUserSettings();
+        if (!settings?.openai_api_key) {
+          setShowApiKeyDialog(true);
+        }
+      } catch (error) {
+        console.error('Error checking API key:', error);
+      }
+    };
+
+    checkApiKey();
+  }, []);
 
   const handleExport = () => {
     const rows = [['Cluster', 'Keywords']];
@@ -43,8 +58,7 @@ export function ClusteringResults({ clusters = {} }: ClusteringResultsProps) {
     }
   };
 
-  // If error is about missing API key, show dialog
-  if (clusters && Object.keys(clusters).length === 0 && showApiKeyDialog) {
+  if (showApiKeyDialog) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
