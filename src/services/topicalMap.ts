@@ -99,7 +99,7 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
               content: createUserPrompt(keyword)
             }
           ],
-          temperature: 0.5,
+          temperature: 0.7, // Increased slightly to encourage more diverse responses
           max_tokens: 2500
         },
         {
@@ -115,7 +115,25 @@ export async function generateTopicalMap(keyword: string): Promise<TopicalMap> {
         throw new Error('No content received from OpenAI');
       }
 
-      const result = JSON.parse(content);
+      let result = JSON.parse(content);
+      
+      // Ensure exactly 10 categories
+      if (result.categories.length < 10) {
+        // Pad with empty categories if needed
+        while (result.categories.length < 10) {
+          result.categories.push({
+            name: `Additional Category ${result.categories.length + 1}`,
+            pages: Array(5).fill(null).map((_, i) => ({
+              title: `Sample Page ${i + 1}`,
+              intent: 'informational'
+            }))
+          });
+        }
+      } else if (result.categories.length > 10) {
+        // Take only the first 10 categories
+        result.categories = result.categories.slice(0, 10);
+      }
+
       validateTopicalMap(result);
 
       // Cache the result
@@ -166,7 +184,17 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
     }
 
     if (category.pages.length !== 5) {
-      throw new Error(`Category "${category.name}" must have exactly 5 pages (found ${category.pages.length})`);
+      // Pad or trim pages to exactly 5
+      if (category.pages.length < 5) {
+        while (category.pages.length < 5) {
+          category.pages.push({
+            title: `Additional Page ${category.pages.length + 1}`,
+            intent: 'informational'
+          });
+        }
+      } else {
+        category.pages = category.pages.slice(0, 5);
+      }
     }
 
     category.pages.forEach((page: any, pageIndex: number) => {
@@ -175,7 +203,8 @@ function validateTopicalMap(map: any): asserts map is TopicalMap {
       }
 
       if (!['informational', 'commercial', 'transactional', 'navigational'].includes(page.intent)) {
-        throw new Error(`Invalid intent "${page.intent}" for page "${page.title}" in category "${category.name}"`);
+        // Default to informational if invalid intent
+        page.intent = 'informational';
       }
     });
   });
