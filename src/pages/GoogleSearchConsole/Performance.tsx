@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronLeft, ChevronRight, Download, HelpCircle, ListPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
@@ -89,6 +89,16 @@ export function GoogleSearchConsolePerformance() {
     }
   };
 
+  const calculateTotal = (data: any[] | undefined | null, key: string): number => {
+    if (!Array.isArray(data)) return 0;
+    return data.reduce((sum: number, item: any) => sum + (item[key] || 0), 0);
+  };
+
+  const calculateAverage = (data: any[] | undefined | null, key: string): number => {
+    if (!Array.isArray(data) || data.length === 0) return 0;
+    return calculateTotal(data, key) / data.length;
+  };
+
   const handleExport = () => {
     if (!dimensionData?.data?.length) return;
 
@@ -157,25 +167,25 @@ export function GoogleSearchConsolePerformance() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.clicks, 0).toLocaleString()}
+                {calculateTotal(timeSeriesData, 'clicks').toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.impressions, 0).toLocaleString()}
+                {calculateTotal(timeSeriesData, 'impressions').toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.ctr, 0) / (timeSeriesData?.length || 1)).toFixed(2)}%
+                {calculateAverage(timeSeriesData, 'ctr').toFixed(2)}%
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average Position</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
+                {calculateAverage(timeSeriesData, 'position').toFixed(1)}
               </p>
             </div>
           </div>
