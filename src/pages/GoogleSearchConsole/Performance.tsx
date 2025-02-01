@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -9,16 +8,13 @@ import { KeywordListActions } from '../../components/keywords/KeywordListActions
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
 
-const ITEMS_PER_PAGE = 100;
-
 export function GoogleSearchConsolePerformance() {
-  const { domain } = useParams<{ domain: string }>();
+  const { user } = useAuth();
   const [dateRange, setDateRange] = useState('28');
   const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
   const [queryPage, setQueryPage] = useState(1);
   const [pagesPage, setPagesPage] = useState(1);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
-  const { user } = useAuth();
 
   // Default location and language parameters
   const currentParams = {
@@ -133,7 +129,9 @@ export function GoogleSearchConsolePerformance() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Performance: {decodeURIComponent(domain || '')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          Performance Analysis: {decodeURIComponent(domain || '')}
+        </h1>
         
         <div className="flex gap-2">
           <button
@@ -167,25 +165,25 @@ export function GoogleSearchConsolePerformance() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
               <p className="text-3xl font-bold">
-                {calculateTotal(timeSeriesData, 'clicks').toLocaleString()}
+                {calculateTotal(timeSeriesData?.rows, 'clicks').toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
               <p className="text-3xl font-bold">
-                {calculateTotal(timeSeriesData, 'impressions').toLocaleString()}
+                {calculateTotal(timeSeriesData?.rows, 'impressions').toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
               <p className="text-3xl font-bold">
-                {calculateAverage(timeSeriesData, 'ctr').toFixed(2)}%
+                {calculateAverage(timeSeriesData?.rows, 'ctr').toFixed(2)}%
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average Position</h3>
               <p className="text-3xl font-bold">
-                {calculateAverage(timeSeriesData, 'position').toFixed(1)}
+                {calculateAverage(timeSeriesData?.rows, 'position').toFixed(1)}
               </p>
             </div>
           </div>
@@ -246,7 +244,7 @@ export function GoogleSearchConsolePerformance() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm text-gray-600">
-                  {(getCurrentPage() - 1) * ITEMS_PER_PAGE + 1}-{Math.min(getCurrentPage() * ITEMS_PER_PAGE, totalItems)} of {totalItems}
+                  Showing {(getCurrentPage() - 1) * ITEMS_PER_PAGE + 1}-{Math.min(getCurrentPage() * ITEMS_PER_PAGE, totalItems)} of {totalItems} total results
                 </div>
                 <div className="flex items-center gap-4">
                   <button
