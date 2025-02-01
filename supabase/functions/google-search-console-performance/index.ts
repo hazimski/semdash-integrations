@@ -58,8 +58,9 @@ serve(async (req) => {
           startDate: startDate.toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
           dimensions: [dimension],
-          rowLimit: 1000,
-          aggregationType: 'auto'
+          rowLimit: 25000, // Maximum allowed by GSC API
+          aggregationType: 'byProperty', // This matches GSC dashboard aggregation
+          dataState: 'all' // Include all data states
         }),
       }
     )
@@ -72,16 +73,16 @@ serve(async (req) => {
 
     const performance = await performanceResponse.json()
     
+    console.log(`Retrieved ${performance.rows?.length || 0} rows of data`)
+    
     // Transform the data to match Google Search Console format exactly
     const transformedData = performance.rows?.map((row: any) => ({
       key: row.keys[0],
       clicks: Math.round(row.clicks || 0),
       impressions: Math.round(row.impressions || 0),
-      ctr: parseFloat(((row.ctr || 0) * 100).toFixed(2)),
-      position: parseFloat(row.position?.toFixed(1) || '0')
+      ctr: parseFloat((row.ctr * 100).toFixed(2)),
+      position: parseFloat(row.position.toFixed(1))
     })) || []
-
-    console.log('Transformed data:', transformedData)
 
     return new Response(
       JSON.stringify(transformedData),
