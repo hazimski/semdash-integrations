@@ -132,6 +132,54 @@ export function GoogleSearchConsolePerformance() {
   const endIndex = startIndex + itemsPerPage;
   const currentData = filterData(timeSeriesData?.slice(startIndex, endIndex) || []);
 
+  const handleExport = () => {
+    if (!currentData?.length) return;
+
+    const csvContent = [
+      // CSV Headers
+      ['Key', 'Clicks', 'Impressions', 'CTR', 'Position'].join(','),
+      // CSV Data rows
+      ...currentData.map(row => [
+        `"${row.key}"`,
+        row.clicks,
+        row.impressions,
+        `${row.ctr.toFixed(2)}%`,
+        row.position.toFixed(1)
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    saveAs(blob, `gsc-performance-${activeDimension}-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleDomainChange = (value: string) => {
+    navigate(`/google-search-console/performance/${encodeURIComponent(value)}`);
+  };
+
+  const handleSelectAll = () => {
+    if (currentData?.length) {
+      if (selectedQueries.size === currentData.length) {
+        setSelectedQueries(new Set());
+      } else {
+        setSelectedQueries(new Set(currentData.map(row => row.key)));
+      }
+    }
+  };
+
+  const handleSelectQuery = (key: string) => {
+    const newSelected = new Set(selectedQueries);
+    if (newSelected.has(key)) {
+      newSelected.delete(key);
+    } else {
+      newSelected.add(key);
+    }
+    setSelectedQueries(newSelected);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -251,7 +299,7 @@ export function GoogleSearchConsolePerformance() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={handleExport}
-                    disabled={!dimensionData?.length}
+                    disabled={!currentData?.length}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Download className="h-4 w-4 mr-2" />
