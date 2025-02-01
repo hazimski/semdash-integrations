@@ -2,28 +2,18 @@ import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeft, ChevronRight, Download, ListPlus } from 'lucide-react';
-import { KeywordListActions } from '../../components/keywords/KeywordListActions';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
-
-interface PerformanceData {
-  key: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-type Dimension = 'query' | 'page' | 'country' | 'device' | 'searchAppearance';
+import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
   const [dateRange, setDateRange] = useState('28');
-  const [activeDimension, setActiveDimension] = useState<Dimension>('query');
+  const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentPagesPage, setCurrentPagesPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const { user } = useAuth();
@@ -135,7 +125,11 @@ export function GoogleSearchConsolePerformance() {
   };
 
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
+    if (activeDimension === 'page') {
+      setCurrentPagesPage(newPage);
+    } else {
+      setCurrentPage(newPage);
+    }
   };
 
   return (
@@ -175,25 +169,25 @@ export function GoogleSearchConsolePerformance() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Clicks</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.clicks, 0).toLocaleString()}
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.clicks, 0).toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Total Impressions</h3>
               <p className="text-3xl font-bold">
-                {timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.impressions, 0).toLocaleString()}
+                {timeSeriesData?.reduce((sum: number, item: any) => sum + item.impressions, 0).toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average CTR</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.ctr, 0) / (timeSeriesData?.length || 1)).toFixed(2)}%
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.ctr, 0) / (timeSeriesData?.length || 1) * 100).toFixed(2)}%
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">Average Position</h3>
               <p className="text-3xl font-bold">
-                {(timeSeriesData?.reduce((sum: number, item: PerformanceData) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
+                {(timeSeriesData?.reduce((sum: number, item: any) => sum + item.position, 0) / (timeSeriesData?.length || 1)).toFixed(1)}
               </p>
             </div>
           </div>
@@ -210,7 +204,8 @@ export function GoogleSearchConsolePerformance() {
                   searchVolume: item.impressions,
                   cpc: 0,
                   keywordDifficulty: 0,
-                  intent: 'informational'
+                  intent: 'informational',
+                  source: 'GSC'
                 }))}
               />
             )}
@@ -286,7 +281,7 @@ export function GoogleSearchConsolePerformance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentData.map((item: PerformanceData) => (
+                  {currentData.map((item: any) => (
                     <tr key={item.key} className="border-t">
                       <td className="py-4 pr-4">
                         <input
@@ -308,19 +303,19 @@ export function GoogleSearchConsolePerformance() {
 
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
-                  Page {currentPage} of {totalPages}
+                  Page {activeDimension === 'page' ? currentPagesPage : currentPage} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange((activeDimension === 'page' ? currentPagesPage : currentPage) - 1)}
+                    disabled={activeDimension === 'page' ? currentPagesPage === 1 : currentPage === 1}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange((activeDimension === 'page' ? currentPagesPage : currentPage) + 1)}
+                    disabled={activeDimension === 'page' ? currentPagesPage === totalPages : currentPage === totalPages}
                     className="p-2 rounded hover:bg-gray-100 disabled:opacity-50"
                   >
                     <ChevronRight className="w-5 h-5" />
