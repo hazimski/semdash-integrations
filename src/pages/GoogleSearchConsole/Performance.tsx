@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeft, ChevronRight, Download, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
@@ -12,16 +12,11 @@ import { saveAs } from 'file-saver';
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
   const [dateRange, setDateRange] = useState('28');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [activeDimension, setActiveDimension] = useState<'query' | 'page' | 'country' | 'device' | 'searchAppearance'>('query');
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPagesPage, setCurrentPagesPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
-  const [searchType, setSearchType] = useState<'web' | 'news' | 'image' | 'video'>('web');
-  const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedDevice, setSelectedDevice] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -50,35 +45,15 @@ export function GoogleSearchConsolePerformance() {
   };
 
   const { data: timeSeriesData, isLoading: timeSeriesLoading } = useQuery({
-    queryKey: ['gsc-performance-time', domain, dateRange, startDate, endDate, searchType, selectedCountry, selectedDevice],
+    queryKey: ['gsc-performance-time', domain, dateRange],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      const filters = [];
-      if (selectedCountry) {
-        filters.push({
-          dimension: 'country',
-          expression: selectedCountry
-        });
-      }
-      if (selectedDevice) {
-        filters.push({
-          dimension: 'device',
-          expression: selectedDevice
-        });
-      }
-
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
         body: { 
           siteUrl: decodeURIComponent(domain || ''),
           days: parseInt(dateRange),
-          startDate,
-          endDate,
-          dimension: 'date',
-          searchType,
-          dimensionFilterGroups: filters.length ? [{
-            filters
-          }] : undefined
+          dimension: 'date'
         },
         headers: {
           'x-user-id': user.id
@@ -96,28 +71,11 @@ export function GoogleSearchConsolePerformance() {
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      const filters = [];
-      if (selectedCountry) {
-        filters.push({
-          dimension: 'country',
-          expression: selectedCountry
-        });
-      }
-      if (selectedDevice) {
-        filters.push({
-          dimension: 'device',
-          expression: selectedDevice
-        });
-      }
-
       const { data, error } = await supabase.functions.invoke('google-search-console-performance', {
         body: { 
           siteUrl: decodeURIComponent(domain || ''),
           days: parseInt(dateRange),
-          dimension: activeDimension,
-          dimensionFilterGroups: filters.length ? [{
-            filters
-          }] : undefined
+          dimension: activeDimension
         },
         headers: {
           'x-user-id': user.id
@@ -242,65 +200,7 @@ export function GoogleSearchConsolePerformance() {
           >
             Last 3 months
           </button>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setDateRange('custom');
-              }}
-              className="px-3 py-2 border rounded"
-            />
-            <span>-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setDateRange('custom');
-              }}
-              className="px-3 py-2 border rounded"
-            />
-          </div>
         </div>
-      </div>
-
-      <div className="mb-6 flex gap-4">
-        <select
-          value={searchType}
-          onChange={(e) => setSearchType(e.target.value as any)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="web">Web</option>
-          <option value="news">News</option>
-          <option value="image">Image</option>
-          <option value="video">Video</option>
-        </select>
-
-        <select
-          value={selectedCountry}
-          onChange={(e) => setSelectedCountry(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="">All Countries</option>
-          <option value="usa">United States</option>
-          <option value="gbr">United Kingdom</option>
-          <option value="ind">India</option>
-          <option value="can">Canada</option>
-          {/* Add more countries as needed */}
-        </select>
-
-        <select
-          value={selectedDevice}
-          onChange={(e) => setSelectedDevice(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="">All Devices</option>
-          <option value="MOBILE">Mobile</option>
-          <option value="DESKTOP">Desktop</option>
-          <option value="TABLET">Tablet</option>
-        </select>
       </div>
 
       {isLoading ? (
