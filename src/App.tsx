@@ -363,15 +363,6 @@ export default function App() {
                       <PPA />
                     </ProtectedRoute>
                   } />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
-                        <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Route>
                   <Route path="/ppa/results" element={
                     <ProtectedRoute>
                       <PPAResults />

@@ -1,10 +1,7 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { TopicalMap } from '../../services/topicalMap';
-import { ApiKeyDialog } from '../domain/copilot/ApiKeyDialog';
-import { updateOpenAIKey } from '../../services/settings';
-import { toast } from 'react-hot-toast';
 
 interface ResultsViewProps {
   keyword: string;
@@ -12,20 +9,6 @@ interface ResultsViewProps {
 }
 
 export function ResultsView({ keyword, map }: ResultsViewProps) {
-  const [showApiKeyDialog, setShowApiKeyDialog] = React.useState(false);
-  const [apiKey, setApiKey] = React.useState('');
-
-  const handleSaveApiKey = async () => {
-    try {
-      await updateOpenAIKey(apiKey);
-      setShowApiKeyDialog(false);
-      toast.success('API key saved successfully');
-      window.location.reload(); // Reload to retry the request
-    } catch (error) {
-      toast.error('Failed to save API key');
-    }
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -48,23 +31,24 @@ export function ResultsView({ keyword, map }: ResultsViewProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {map.categories.map((category, index) => (
-          <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{category.name}</h2>
+          <div key={index} className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">{category.name}</h2>
             </div>
             <div className="p-6 space-y-4">
               {category.pages.map((page, pageIndex) => (
                 <div 
                   key={pageIndex}
-                  className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
+                  <FileText className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="text-gray-900 dark:text-gray-100 font-medium">{page.title}</h3>
+                    <h3 className="text-gray-900 font-medium">{page.title}</h3>
                     <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${
-                      page.intent === 'informational' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                      page.intent === 'commercial' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      page.intent === 'transactional' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                      'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                      page.intent === 'informational' ? 'bg-blue-100 text-blue-800' :
+                      page.intent === 'commercial' ? 'bg-green-100 text-green-800' :
+                      page.intent === 'transactional' ? 'bg-purple-100 text-purple-800' :
+                      'bg-orange-100 text-orange-800'
                     }`}>
                       {page.intent}
                     </span>
@@ -75,15 +59,6 @@ export function ResultsView({ keyword, map }: ResultsViewProps) {
           </div>
         ))}
       </div>
-
-      {showApiKeyDialog && (
-        <ApiKeyDialog
-          apiKey={apiKey}
-          onApiKeyChange={setApiKey}
-          onSave={handleSaveApiKey}
-          onClose={() => setShowApiKeyDialog(false)}
-        />
-      )}
     </div>
   );
 }
