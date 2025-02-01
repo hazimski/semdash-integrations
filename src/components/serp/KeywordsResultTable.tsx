@@ -1,32 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, ChevronLeft, ChevronRight, Download, ListPlus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, ChevronLeft, ChevronRight, ListPlus } from 'lucide-react';
 import { formatNumber, formatCurrency } from '../../utils/format';
 import { getDifficultyColor } from '../../utils/difficulty';
 import { KeywordTrendChart } from './KeywordTrendChart';
-import { createKeywordList, addKeywordsToList, getKeywordLists, KeywordList } from '../../services/keywordLists';
-import { toast } from 'react-hot-toast';
+import { KeywordListActions } from '../keywords/KeywordListActions';
 import { useLocation } from 'react-router-dom';
 import { locations } from '../../data/locations';
-
-interface Keyword {
-  keyword: string;
-  searchVolume: number;
-  cpc: number;
-  competition: number;
-  keywordDifficulty: number;
-  monthlySearches: Array<{
-    year: number;
-    month: number;
-    search_volume: number;
-  }>;
-  backlinks: number;
-  referringDomains: number;
-  domainRank: number;
-  intent: string;
-}
+import { saveAs } from 'file-saver';
 
 interface KeywordsResultTableProps {
-  keywords: Keyword[];
+  keywords: Array<{
+    keyword: string;
+    searchVolume: number;
+    cpc: number;
+    keywordDifficulty: number;
+    intent: string;
+    backlinks: number;
+    referringDomains: number;
+    rank: number;
+    lastUpdatedTime?: string;
+    monthlySearches?: Array<{
+      year: number;
+      month: number;
+      search_volume: number;
+    }>;
+  }>;
   totalCount: number;
   currentPage: number;
   onPageChange: (page: number) => void;
@@ -35,7 +33,7 @@ interface KeywordsResultTableProps {
   itemsPerPage?: number;
 }
 
-export function KeywordsResultTable({ 
+export function KeywordsResultTable({
   keywords = [],
   totalCount = 0,
   currentPage,
@@ -46,12 +44,6 @@ export function KeywordsResultTable({
 }: KeywordsResultTableProps) {
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [newListName, setNewListName] = useState('');
-  const [newListDescription, setNewListDescription] = useState('');
-  const [existingLists, setExistingLists] = useState<KeywordList[]>([]);
-  const [selectedListId, setSelectedListId] = useState<string>('');
-  const [isSavingToExisting, setIsSavingToExisting] = useState(false);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const totalPages = Math.ceil(totalCount / itemsPerPage);
@@ -69,67 +61,6 @@ export function KeywordsResultTable({
     lang.code === currentLanguageCode
   )?.name || currentLanguageCode;
 
-  useEffect(() => {
-    loadExistingLists();
-  }, []);
-
-  const loadExistingLists = async () => {
-    try {
-      const lists = await getKeywordLists();
-      setExistingLists(lists);
-    } catch (error) {
-      console.error('Error loading keyword lists:', error);
-    }
-  };
-
-  const handleSaveToList = async () => {
-    try {
-      let listId = selectedListId;
-
-      if (!isSavingToExisting) {
-        if (!newListName) {
-          toast.error('Please enter a list name');
-          return;
-        }
-
-        // Create new list
-        const list = await createKeywordList(newListName, newListDescription);
-        listId = list.id;
-      } else if (!listId) {
-        toast.error('Please select a list');
-        return;
-      }
-
-      // Add selected keywords to list
-      const selectedKeywordData = keywords
-        .filter(k => selectedKeywords.has(k.keyword))
-        .map(k => ({
-          keyword: k.keyword,
-          search_volume: k.searchVolume,
-          cpc: k.cpc,
-          competition: k.competition,
-          keyword_difficulty: k.keywordDifficulty,
-          intent: k.intent,
-          source: 'By SERP',
-          language: languageName,
-          location: locationName
-        }));
-
-      await addKeywordsToList(listId, selectedKeywordData);
-
-      toast.success('Keywords saved to list successfully');
-      setShowSaveDialog(false);
-      setNewListName('');
-      setNewListDescription('');
-      setSelectedListId('');
-      setSelectedKeywords(new Set());
-      setIsSavingToExisting(false);
-    } catch (error) {
-      console.error('Error saving keywords:', error);
-      toast.error('Failed to save keywords to list');
-    }
-  };
-
   const handleKeywordSelect = (keyword: string) => {
     const newSelected = new Set(selectedKeywords);
     if (newSelected.has(keyword)) {
@@ -140,46 +71,49 @@ export function KeywordsResultTable({
     setSelectedKeywords(newSelected);
   };
 
+  const handleSelectAll = () => {
+    if (selectedKeywords.size === keywords.length) {
+      setSelectedKeywords(new Set());
+    } else {
+      setSelectedKeywords(new Set(keywords.map(k => k.keyword)));
+    }
+  };
+
   const handleExport = () => {
     if (!keywords.length) return;
 
+    const selectedData = keywords.filter(k => selectedKeywords.has(k.keyword));
+    const dataToExport = selectedData.length ? selectedData : keywords;
+
     const headers = [
       'Keyword',
-      'Volume',
+      'Search Volume',
       'CPC',
-      'Competition',
-      'KD',
+      'Keyword Difficulty',
+      'Intent',
       'Backlinks',
       'Referring Domains',
-      'Domain Rank',
-      'Intent'
+      'Rank',
+      'Last Updated'
     ];
 
-    const csvData = keywords.map(keyword => [
-      keyword.keyword,
-      keyword.searchVolume,
-      keyword.cpc,
-      keyword.competition,
-      keyword.keywordDifficulty,
-      keyword.backlinks,
-      keyword.referringDomains,
-      keyword.domainRank,
-      keyword.intent
-    ]);
-
-    const csvContent = [
+    const csvData = [
       headers.join(','),
-      ...csvData.map(row => row.join(','))
+      ...dataToExport.map(k => [
+        k.keyword,
+        k.searchVolume,
+        k.cpc,
+        k.keywordDifficulty,
+        k.intent,
+        k.backlinks,
+        k.referringDomains,
+        k.rank,
+        k.lastUpdatedTime || ''
+      ].join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'serp_keywords.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, 'keyword_data.csv');
   };
 
   if (isLoading) {
@@ -208,26 +142,19 @@ export function KeywordsResultTable({
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {selectedKeywords.size > 0 && (
-        <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700">
-              {selectedKeywords.size} keywords selected
-            </span>
-            <button
-              onClick={() => setShowSaveDialog(true)}
-              className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              <ListPlus className="w-4 h-4 mr-2" />
-              Save to List
-            </button>
-          </div>
-        </div>
+        <KeywordListActions
+          selectedKeywords={selectedKeywords}
+          onClearSelection={() => setSelectedKeywords(new Set())}
+          locationName={locationName}
+          languageName={languageName}
+          keywords={keywords.filter(k => selectedKeywords.has(k.keyword))}
+        />
       )}
 
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">
-            All Results ({formatNumber(totalCount)})
+            Results ({formatNumber(totalCount)})
           </h2>
           <button
             onClick={handleExport}
@@ -248,13 +175,7 @@ export function KeywordsResultTable({
                 <input
                   type="checkbox"
                   checked={selectedKeywords.size === keywords.length}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedKeywords(new Set(keywords.map(k => k.keyword)));
-                    } else {
-                      setSelectedKeywords(new Set());
-                    }
-                  }}
+                  onChange={handleSelectAll}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
@@ -262,42 +183,36 @@ export function KeywordsResultTable({
                 Keyword
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Volume
+                Search Volume
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 CPC
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Competition
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                KD
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Backlinks
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Ref Domains
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Domain Rank
+                Keyword Difficulty
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Intent
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Trend
+                Backlinks
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Referring Domains
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rank
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Last Updated
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {keywords.map((keyword, index) => (
-              <React.Fragment key={index}>
-                <tr 
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => setExpandedKeyword(expandedKeyword === keyword.keyword ? null : keyword.keyword)}
-                >
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+            {keywords.map((keyword) => (
+              <React.Fragment key={keyword.keyword}>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
                     <input
                       type="checkbox"
                       checked={selectedKeywords.has(keyword.keyword)}
@@ -315,48 +230,29 @@ export function KeywordsResultTable({
                     {formatCurrency(keyword.cpc)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {Math.round(keyword.competition * 100)}%
+                    {Math.round(keyword.keywordDifficulty)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center space-x-2">
-                      <span>{Math.round(keyword.keywordDifficulty)}</span>
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: getDifficultyColor(keyword.keywordDifficulty) }}
-                      ></div>
-                    </div>
+                    {keyword.intent}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatNumber(keyword.backlinks)}
+                    {keyword.backlinks}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatNumber(keyword.referringDomains)}
+                    {keyword.referringDomains}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {Math.round(keyword.domainRank)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-lg capitalize ${
-                      keyword.intent === 'informational' ? 'bg-blue-100 text-blue-800' :
-                      keyword.intent === 'commercial' ? 'bg-purple-100 text-purple-800' :
-                      keyword.intent === 'navigational' ? 'bg-green-100 text-green-800' :
-                      keyword.intent === 'transactional' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {keyword.intent}
-                    </span>
+                    {keyword.rank}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <button className="text-blue-600 hover:text-blue-800">
-                      <TrendingUp className="w-4 h-4" />
-                    </button>
+                    {keyword.lastUpdatedTime}
                   </td>
                 </tr>
                 {expandedKeyword === keyword.keyword && (
                   <tr>
-                    <td colSpan={11} className="px-6 py-4 bg-gray-50">
+                    <td colSpan={10} className="px-6 py-4 bg-gray-50">
                       <div className="h-[200px]">
-                        <KeywordTrendChart data={keyword.monthlySearches} />
+                        <KeywordTrendChart data={keyword.monthlySearches || []} />
                       </div>
                     </td>
                   </tr>
@@ -438,93 +334,6 @@ export function KeywordsResultTable({
                 <ChevronRight className="h-5 w-5" />
               </button>
             </nav>
-          </div>
-        </div>
-      )}
-
-      {showSaveDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Save Keywords to List</h3>
-            
-            <div className="space-y-4">
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => setIsSavingToExisting(false)}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-lg ${
-                    !isSavingToExisting 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  New List
-                </button>
-                <button
-                  onClick={() => setIsSavingToExisting(true)}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-lg ${
-                    isSavingToExisting 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Existing List
-                </button>
-              </div>
-
-              {isSavingToExisting ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Select List</label>
-                  <select
-                    value={selectedListId}
-                    onChange={(e) => setSelectedListId(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  >
-                    <option value="">Select a list...</option>
-                    {existingLists.map(list => (
-                      <option key={list.id} value={list.id}>{list.name}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">List Name</label>
-                    <input
-                      type="text"
-                      value={newListName}
-                      onChange={(e) => setNewListName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="Enter list name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Description (Optional)</label>
-                    <textarea
-                      value={newListDescription}
-                      onChange={(e) => setNewListDescription(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      rows={3}
-                      placeholder="Enter list description"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowSaveDialog(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveToList}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                >
-                  Save Keywords
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
