@@ -28,7 +28,7 @@ serve(async (req) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
-      .select('google_access_token')
+      .select('google_access_token, google_refresh_token, google_token_expiry')
       .eq('user_id', userId)
       .single()
 
@@ -46,6 +46,21 @@ serve(async (req) => {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
+    const requestBody = {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0],
+      dimensions: [dimension],
+      rowLimit: 25000, // Maximum allowed by GSC API
+      aggregationType: 'byProperty', // This matches GSC dashboard aggregation
+      dataState: 'all' // Include all data states
+    }
+
+    console.log('GSC API Request:', {
+      url: siteUrl,
+      body: requestBody,
+      tokenLength: settings.google_access_token.length
+    })
+
     const performanceResponse = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
       {
@@ -54,21 +69,19 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${settings.google_access_token}`,
         },
-        body: JSON.stringify({
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
-          dimensions: [dimension],
-          rowLimit: 25000, // Maximum allowed by GSC API
-          aggregationType: 'byProperty', // This matches GSC dashboard aggregation
-          dataState: 'all' // Include all data states
-        }),
+        body: JSON.stringify(requestBody),
       }
     )
 
     if (!performanceResponse.ok) {
       const errorData = await performanceResponse.json()
-      console.error('Google API error:', errorData)
-      throw new Error('Failed to fetch data from Google Search Console')
+      console.error('Google API error response:', errorData)
+      
+      if (performanceResponse.status === 401) {
+        throw new Error('Google access token expired')
+      }
+      
+      throw new Error(`Google API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
     const performance = await performanceResponse.json()
@@ -91,7 +104,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in google-search-console-performance function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Failed to fetch data from Google Search Console' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
         status: 400 
