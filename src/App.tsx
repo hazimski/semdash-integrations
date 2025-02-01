@@ -81,8 +81,6 @@ import { PPA } from './pages/PPA';
 import { PPAResults } from './pages/PPA/Results';
 import { Performance } from './pages/Performance';
 import { PerformanceResults } from './pages/Performance/Results';
-import { Settings } from './pages/Settings';
-
 
 // Google Search Console
 import { GoogleSearchConsole } from './pages/GoogleSearchConsole';
