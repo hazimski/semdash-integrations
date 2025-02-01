@@ -17,8 +17,9 @@ export function GoogleSearchConsoleCallback() {
       }
 
       try {
+        // Call the google-search-console-auth edge function
         const { data, error } = await supabase.functions.invoke('google-search-console-auth', {
-          body: { code }
+          body: { code, redirect_uri: `${window.location.origin}/google-search-console/callback` }
         });
 
         if (error) throw error;

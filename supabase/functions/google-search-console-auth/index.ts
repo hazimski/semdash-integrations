@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { code } = await req.json()
+    const { code, redirect_uri } = await req.json()
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -24,7 +24,7 @@ serve(async (req) => {
         code,
         client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
         client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-        redirect_uri: `${req.headers.get('origin')}/google-search-console/callback`,
+        redirect_uri,
         grant_type: 'authorization_code',
       }),
     })
