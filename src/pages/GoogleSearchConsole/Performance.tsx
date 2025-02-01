@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { KeywordListActions } from '../../components/keywords/KeywordListActions';
 import { toast } from 'react-hot-toast';
