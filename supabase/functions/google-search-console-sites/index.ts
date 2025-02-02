@@ -3,10 +3,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -17,6 +19,8 @@ serve(async (req) => {
     if (!userId) {
       throw new Error('User ID not provided')
     }
+
+    console.log('Processing request for user:', userId)
 
     // Initialize Supabase client
     const supabase = createClient(
@@ -32,16 +36,18 @@ serve(async (req) => {
       .single()
 
     if (settingsError || !settings) {
+      console.error('Failed to get user settings:', settingsError)
       throw new Error('Failed to get user settings')
     }
 
     const { google_access_token, google_refresh_token, google_token_expiry } = settings
 
     if (!google_access_token || !google_refresh_token) {
+      console.error('Google tokens not found')
       throw new Error('Google tokens not found')
     }
 
-    // Check if token needs refresh (if it expires in less than 5 minutes or is expired)
+    // Check if token needs refresh
     const tokenExpiryDate = new Date(google_token_expiry)
     const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000)
     
@@ -106,7 +112,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify(sitesData),
+      JSON.stringify(sitesData.siteEntry || []),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
