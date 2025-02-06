@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -111,16 +112,31 @@ serve(async (req) => {
       throw new Error(sitesData.error.message || 'Failed to fetch sites')
     }
 
+    // Return the sites data with CORS headers
     return new Response(
-      JSON.stringify(sitesData.siteEntry || []),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ data: sitesData.siteEntry || [], error: null }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+        } 
+      }
     )
 
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to fetch sites from Google Search Console' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      JSON.stringify({ 
+        data: null, 
+        error: error.message || 'Failed to fetch sites from Google Search Console'
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        }, 
+        status: 400 
+      }
     )
   }
 })
