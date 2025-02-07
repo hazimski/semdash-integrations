@@ -155,10 +155,18 @@ In the text output don't include **. start each new section with a relevant emoj
       })
     })
 
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`)
+    }
+
     const result = await response.json()
+    if (!result.choices?.[0]?.message?.content) {
+      throw new Error('Invalid response from OpenAI')
+    }
     
     return new Response(
-      JSON.stringify(result.choices[0]?.message?.content || 'No content generated.'),
+      JSON.stringify(result.choices[0].message.content),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
