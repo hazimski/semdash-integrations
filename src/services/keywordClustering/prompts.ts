@@ -1,3 +1,4 @@
+
 export const PROMPTS = {
   semantic: 'Group these keywords based on their semantic meaning and search intent. Create clusters where keywords share similar meanings or purposes.',
   modifier: 'Group these keywords based on their modifiers (e.g., "best", "how to", "vs", "for", etc.). Each cluster should represent a specific modifier type.',
