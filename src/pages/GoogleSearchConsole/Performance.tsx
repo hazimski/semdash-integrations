@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Unlink, ArrowDown, ArrowUp } from 'lucide-react';
 import { saveAs } from 'file-saver';
+import { toast } from 'react-hot-toast';
+
+type SortField = 'clicks' | 'impressions' | 'ctr' | 'position';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  direction: SortDirection;
+}
 
 export function GoogleSearchConsolePerformance() {
   const { domain } = useParams<{ domain: string }>();
@@ -16,8 +25,10 @@ export function GoogleSearchConsolePerformance() {
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<{dimension: string, expression: string} | null>(null);
+  const [sort, setSort] = useState<SortConfig>({ field: 'clicks', direction: 'desc' });
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Query for available domains
   const { data: domains } = useQuery({
@@ -93,6 +104,45 @@ export function GoogleSearchConsolePerformance() {
     enabled: !!user?.id && !!domain
   });
 
+  const handleDisconnect = async () => {
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expiry: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Invalidate the domains query to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['gsc-domains'] });
+      
+      toast.success('Successfully disconnected from Google Search Console');
+      navigate('/google-search-console');
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      toast.error('Failed to disconnect from Google Search Console');
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    setSort(prevSort => ({
+      field,
+      direction: prevSort.field === field && prevSort.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const sortData = (data: any[]) => {
+    return [...data].sort((a, b) => {
+      const multiplier = sort.direction === 'asc' ? 1 : -1;
+      return multiplier * (a[sort.field] - b[sort.field]);
+    });
+  };
+
   const isLoading = timeSeriesLoading || dimensionLoading;
   const totalItems = dimensionData?.length || 0;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -103,7 +153,6 @@ export function GoogleSearchConsolePerformance() {
 
   const startIndex = (getCurrentPage() - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = dimensionData?.slice(startIndex, endIndex) || [];
 
   const handleExport = () => {
     if (!dimensionData?.length) return;
@@ -180,6 +229,9 @@ export function GoogleSearchConsolePerformance() {
     }
   };
 
+  const sortedData = dimensionData ? sortData(dimensionData) : [];
+  const currentData = sortedData.slice(startIndex, endIndex) || [];
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -198,7 +250,14 @@ export function GoogleSearchConsolePerformance() {
           </select>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={handleDisconnect}
+            className="inline-flex items-center px-4 py-2 text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+          >
+            <Unlink className="w-4 h-4 mr-2" />
+            Disconnect Google
+          </button>
           <button
             onClick={() => setDateRange('7')}
             className={`px-4 py-2 rounded-lg ${dateRange === '7' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
@@ -398,10 +457,50 @@ export function GoogleSearchConsolePerformance() {
                       />
                     </th>
                     <th className="pb-4">{activeDimension === 'query' ? 'Query' : activeDimension === 'page' ? 'Page' : activeDimension === 'country' ? 'Country' : activeDimension === 'device' ? 'Device' : 'Search Appearance'}</th>
-                    <th className="pb-4 text-right">Clicks</th>
-                    <th className="pb-4 text-right">Impressions</th>
-                    <th className="pb-4 text-right">CTR</th>
-                    <th className="pb-4 text-right">Position</th>
+                    <th 
+                      className="pb-4 text-right cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort('clicks')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Clicks
+                        {sort.field === 'clicks' && (
+                          sort.direction === 'desc' ? <ArrowDown className="w-4 h-4 ml-1" /> : <ArrowUp className="w-4 h-4 ml-1" />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="pb-4 text-right cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort('impressions')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Impressions
+                        {sort.field === 'impressions' && (
+                          sort.direction === 'desc' ? <ArrowDown className="w-4 h-4 ml-1" /> : <ArrowUp className="w-4 h-4 ml-1" />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="pb-4 text-right cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort('ctr')}
+                    >
+                      <div className="flex items-center justify-end">
+                        CTR
+                        {sort.field === 'ctr' && (
+                          sort.direction === 'desc' ? <ArrowDown className="w-4 h-4 ml-1" /> : <ArrowUp className="w-4 h-4 ml-1" />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="pb-4 text-right cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort('position')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Position
+                        {sort.field === 'position' && (
+                          sort.direction === 'desc' ? <ArrowDown className="w-4 h-4 ml-1" /> : <ArrowUp className="w-4 h-4 ml-1" />
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
