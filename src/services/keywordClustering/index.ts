@@ -1,7 +1,6 @@
-import { getUserSettings } from '../settings';
-import axios from 'axios';
+
+import { supabase } from '../../config/supabase';
 import { resultCache, pendingRequests, CACHE_TTL, getCacheKey } from './cache';
-import { buildClusteringPrompt } from './prompts';
 import { validateClusteringResult } from './validation';
 
 export type ClusteringType = 'semantic' | 'modifier' | 'topic' | 'theme';
@@ -29,42 +28,12 @@ export async function clusterKeywords(
     }
 
     const requestPromise = (async () => {
-      const settings = await getUserSettings();
-      if (!settings?.openai_api_key) {
-        throw new Error('OpenAI API key not found');
-      }
+      const { data: result, error } = await supabase.functions.invoke('cluster-keywords', {
+        body: { keywords, type }
+      });
 
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a keyword clustering assistant. Always respond with valid JSON containing a "clusters" object where each key is a descriptive cluster name and the value is an array of keywords.'
-            },
-            {
-              role: 'user',
-              content: buildClusteringPrompt(keywords, type)
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 2000
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${settings.openai_api_key}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      const content = response.data.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('No clustering results received');
-      }
-
-      const result = JSON.parse(content);
+      if (error) throw error;
+      
       validateClusteringResult(result);
 
       // Cache the result
