@@ -1,47 +1,25 @@
 import { api } from './api';
-import axios from 'axios';
-import { getUserSettings } from './settings';
+import { supabase } from '../integrations/supabase/client';
 import { toast } from 'react-hot-toast';
 
 export async function generateKeywords(prompt: string): Promise<string> {
   try {
-    const settings = await getUserSettings();
-    if (!settings?.openai_api_key) {
-      toast.error('OpenAI API key required');
-      throw new Error('API_KEY_REQUIRED');
-    }
+    const { data, error } = await supabase.functions.invoke('generate-ai-keywords', {
+      body: { prompt }
+    });
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a keyword research assistant. Generate a list of keywords based on the user\'s prompt. Return only the keywords, one per line, with no additional text, stop words, brackets, dashes or special characters.'
-          },
-          {
-            role: 'user',
-            content: `${prompt}. Output should be a list of high search volume keywords and nothing else. nothing in brackets, - or any special characters.`
-          }
-        ],
-        temperature: 0.5,
-        max_tokens: 3000
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${settings.openai_api_key}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    return response.data.choices[0]?.message?.content || '';
-  } catch (error) {
-    console.error('Error generating keywords:', error);
-    if (error instanceof Error && error.message === 'API_KEY_REQUIRED') {
+    if (error) {
+      console.error('Error generating keywords:', error);
       throw error;
     }
+
+    if (!data?.keywords) {
+      throw new Error('No keywords generated');
+    }
+
+    return data.keywords;
+  } catch (error) {
+    console.error('Error generating keywords:', error);
     throw new Error('Failed to generate keywords');
   }
 }
