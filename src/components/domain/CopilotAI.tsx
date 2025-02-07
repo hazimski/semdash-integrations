@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Copy, Share2, Menu } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { generateSEOStrategy } from '../../services/openai';
