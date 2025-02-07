@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -17,7 +16,7 @@ export function GoogleSearchConsoleDomains() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: domains = [], isLoading, error } = useQuery({
+  const { data: domains, isLoading, error } = useQuery({
     queryKey: ['gsc-domains'],
     queryFn: async () => {
       if (!user?.id) {
@@ -31,7 +30,6 @@ export function GoogleSearchConsoleDomains() {
       });
       
       if (error) throw error;
-      if (!data) return [];
       return data as Domain[];
     },
     enabled: !!user?.id
@@ -127,13 +125,6 @@ export function GoogleSearchConsoleDomains() {
                 </td>
               </tr>
             ))}
-            {domains.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
-                  No domains found. Please make sure you have access to domains in Google Search Console.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
