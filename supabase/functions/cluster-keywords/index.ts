@@ -32,6 +32,10 @@ serve(async (req) => {
 
     const { keywords, type } = await req.json()
 
+    if (!Array.isArray(keywords) || keywords.length === 0) {
+      throw new Error('Invalid keywords format')
+    }
+
     const prompt = buildClusteringPrompt(keywords, type)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -45,7 +49,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a keyword clustering assistant. Always respond with valid JSON containing a "clusters" object where each key is a descriptive cluster name and the value is an array of keywords.'
+            content: 'You are a keyword clustering assistant. Respond only with a valid JSON object containing a "clusters" object where each key is a descriptive cluster name and the value is an array of keywords. Do not include markdown code blocks or any other text.'
           },
           {
             role: 'user',
@@ -67,6 +71,7 @@ serve(async (req) => {
       throw new Error('Invalid response from OpenAI')
     }
 
+    // Parse the content directly since we ensured OpenAI will return clean JSON
     const clusters = JSON.parse(result.choices[0].message.content)
     
     return new Response(
@@ -87,7 +92,7 @@ serve(async (req) => {
 
 function buildClusteringPrompt(keywords: string[], type: string): string {
   const prompts = {
-    semantic: `Cluster these keywords based on their semantic meaning and topic relationships:\n${keywords.join('\n')}`,
+    semantic: `Group these keywords into semantically related clusters:\n${keywords.join('\n')}`,
     modifier: `Group these keywords based on common modifiers and qualifiers:\n${keywords.join('\n')}`,
     topic: `Organize these keywords into topic-based clusters:\n${keywords.join('\n')}`,
     theme: `Create theme-based clusters for these keywords:\n${keywords.join('\n')}`
