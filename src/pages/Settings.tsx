@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AccountInfo } from '../components/settings/AccountInfo';
 import { OpenAIKeySection } from '../components/settings/OpenAIKeySection';
+import { PasswordUpdateSection } from '../components/settings/PasswordUpdateSection';
 import { getUserSettings, updateOpenAIKey } from '../services/settings';
 import { PricingTable } from './Subscription/PricingTable';
 import { useAuth } from '../contexts/AuthContext';
@@ -65,6 +67,8 @@ export function Settings() {
 
       <div className="grid gap-8">
         <AccountInfo />
+        
+        <PasswordUpdateSection />
         
         <OpenAIKeySection 
           openAIKey={openAIKey}
