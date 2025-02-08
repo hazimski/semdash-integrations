@@ -1,3 +1,4 @@
+
 export interface DomainKeyword {
   keyword: string;
   searchVolume: number;
