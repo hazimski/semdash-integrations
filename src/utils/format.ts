@@ -18,3 +18,4 @@ export function formatCurrency(value: number | null | undefined): string {
   }
   return `$${value.toFixed(2)}`;
 }
+
