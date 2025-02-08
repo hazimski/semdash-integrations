@@ -14,16 +14,6 @@ interface ResultsTableProps {
 type SortField = 'main_domain_rank' | 'backlinks' | 'referring_domains' | 'broken_backlinks' | 'broken_pages' | 'referring_domains_nofollow';
 type SortDirection = 'asc' | 'desc';
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toString();
-}
-
 function calculatePercentage(part: number, total: number): number {
   if (total === 0) return 0;
   return Math.round((part / total) * 100);
