@@ -1,3 +1,4 @@
+
 import { supabase } from '../config/supabase';
 import { BacklinkData } from '../types';
 
@@ -21,10 +22,12 @@ export async function saveBacklinkResults(userId: string, results: BacklinkData[
           referring_links_tld: result.referring_links_tld,
           referring_ips: result.referring_ips
         }))
-      )
-      .select();
+      );
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error saving results:', error);
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('Error saving results:', error);
@@ -40,7 +43,10 @@ export async function getBacklinkHistory(userId: string) {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching history:', error);
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('Error fetching history:', error);
