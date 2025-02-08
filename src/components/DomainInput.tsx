@@ -1,12 +1,15 @@
+
 import React, { useState } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface DomainInputProps {
-  onAnalyze: (domains: string[]) => void;
+  onAnalyze: (domains: string[], tags?: string[]) => void;
 }
 
 export function DomainInput({ onAnalyze }: DomainInputProps) {
   const [domains, setDomains] = useState<string>('');
+  const [tags, setTags] = useState<string>('');
   const [count, setCount] = useState<number>(0);
   const [error, setError] = useState<string>('');
 
@@ -16,12 +19,28 @@ export function DomainInput({ onAnalyze }: DomainInputProps) {
       return false;
     }
 
-    if (domainList.length > 100) {
-      setError('Maximum 100 domains allowed');
+    if (domainList.length > 1000) {
+      setError('Maximum 1000 URLs allowed');
       return false;
     }
 
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/;
+    const uniqueDomains = new Set(
+      domainList.map(url => {
+        try {
+          const domain = new URL(url.startsWith('http') ? url : `https://${url}`).hostname;
+          return domain.replace(/^www\./, '');
+        } catch {
+          return url.split('/')[0].replace(/^www\./, '');
+        }
+      })
+    );
+
+    if (uniqueDomains.size > 100) {
+      setError('URLs cannot belong to more than 100 different domains');
+      return false;
+    }
+
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-_.\/]+\.[a-zA-Z]{2,}$/;
     const invalidDomains = domainList.filter(domain => !domainRegex.test(domain));
 
     if (invalidDomains.length > 0) {
@@ -41,8 +60,13 @@ export function DomainInput({ onAnalyze }: DomainInputProps) {
     setError('');
   };
 
+  const handleTagsInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTags(e.target.value);
+  };
+
   const handleClear = () => {
     setDomains('');
+    setTags('');
     setCount(0);
     setError('');
   };
@@ -54,7 +78,11 @@ export function DomainInput({ onAnalyze }: DomainInputProps) {
       .filter(d => d);
 
     if (validateDomains(domainList)) {
-      onAnalyze(domainList);
+      const tagsList = tags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t);
+      onAnalyze(domainList, tagsList);
     }
   };
 
@@ -65,21 +93,23 @@ export function DomainInput({ onAnalyze }: DomainInputProps) {
           className={`w-full h-40 p-4 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
             error ? 'border-red-500' : 'border-gray-300'
           }`}
-          placeholder="Enter up to 100 domains/subdomains, one per line"
+          placeholder="Enter up to 1000 URLs (max 100 different domains), one per line"
           value={domains}
           onChange={handleInput}
         />
         <div className="absolute top-2 right-2 text-sm text-gray-500">
-          {count}/100
+          {count}/1000
         </div>
-        {domains && (
-          <button
-            onClick={handleClear}
-            className="absolute top-2 right-12 p-1 text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+      </div>
+
+      <div>
+        <input
+          type="text"
+          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Add tags (comma-separated)"
+          value={tags}
+          onChange={handleTagsInput}
+        />
       </div>
 
       {error && (
@@ -92,7 +122,7 @@ export function DomainInput({ onAnalyze }: DomainInputProps) {
       <div className="flex justify-between items-center">
         <button
           onClick={handleSubmit}
-          disabled={count === 0 || count > 100 || !!error}
+          disabled={count === 0 || count > 1000 || !!error}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           Compare

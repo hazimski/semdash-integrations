@@ -65,6 +65,7 @@ export type Database = {
           anchor: number
           backlinks: number
           broken_backlinks: number
+          broken_pages: number | null
           canonical: number
           created_at: string
           id: string
@@ -75,6 +76,7 @@ export type Database = {
           referring_domains_nofollow: number
           referring_ips: number
           referring_links_tld: Json
+          tags: string[] | null
           target: string
           updated_at: string
           user_id: string
@@ -83,6 +85,7 @@ export type Database = {
           anchor: number
           backlinks: number
           broken_backlinks: number
+          broken_pages?: number | null
           canonical: number
           created_at?: string
           id?: string
@@ -93,6 +96,7 @@ export type Database = {
           referring_domains_nofollow: number
           referring_ips: number
           referring_links_tld: Json
+          tags?: string[] | null
           target: string
           updated_at?: string
           user_id: string
@@ -101,6 +105,7 @@ export type Database = {
           anchor?: number
           backlinks?: number
           broken_backlinks?: number
+          broken_pages?: number | null
           canonical?: number
           created_at?: string
           id?: string
@@ -111,6 +116,7 @@ export type Database = {
           referring_domains_nofollow?: number
           referring_ips?: number
           referring_links_tld?: Json
+          tags?: string[] | null
           target?: string
           updated_at?: string
           user_id?: string

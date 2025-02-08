@@ -38,7 +38,7 @@ export function BacklinkAnalysis() {
     }
   };
 
-  const handleAnalyze = async (domainList: string[]) => {
+  const handleAnalyze = async (domainList: string[], tags?: string[]) => {
     setIsLoading(true);
     setError(null);
 
@@ -48,7 +48,7 @@ export function BacklinkAnalysis() {
       
       // Save results to history if user is authenticated
       if (user) {
-        await saveBacklinkResults(user.id, data);
+        await saveBacklinkResults(user.id, data, tags);
         toast.success('Results saved to history');
       }
     } catch (err) {

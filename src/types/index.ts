@@ -22,6 +22,7 @@ export interface BacklinkData {
   backlinks: number;
   referring_domains: number;
   broken_backlinks: number;
+  broken_pages: number;
   referring_domains_nofollow: number;
   anchor: number;
   image: number;
@@ -29,6 +30,11 @@ export interface BacklinkData {
   redirect: number;
   referring_links_tld: Record<string, number>;
   referring_ips: number;
+  tags?: string[];
+  referring_links_attributes?: Record<string, number>;
+  referring_links_platform_types?: Record<string, number>;
+  referring_links_semantic_locations?: Record<string, number>;
+  referring_links_countries?: Record<string, number>;
 }
 
 export interface DomainApiResponse {

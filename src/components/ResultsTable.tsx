@@ -1,6 +1,7 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { BacklinkData } from '../types';
-import { ExternalLink, Download } from 'lucide-react';
+import { ExternalLink, Download, ArrowUpDown } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { InfoDropdown } from './InfoDropdown';
 
@@ -9,6 +10,9 @@ interface ResultsTableProps {
   isLoading?: boolean;
   error?: string | null;
 }
+
+type SortField = 'main_domain_rank' | 'backlinks' | 'referring_domains' | 'broken_backlinks' | 'broken_pages' | 'referring_domains_nofollow';
+type SortDirection = 'asc' | 'desc';
 
 function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -26,6 +30,9 @@ function calculatePercentage(part: number, total: number): number {
 }
 
 export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
   if (isLoading) {
     return (
       <div className="mt-8 flex justify-center">
@@ -46,6 +53,27 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
     return null;
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedData = [...data].sort((a, b) => {
+    if (!sortField) return 0;
+    
+    const aValue = a[sortField];
+    const bValue = b[sortField];
+    
+    if (sortDirection === 'asc') {
+      return aValue - bValue;
+    }
+    return bValue - aValue;
+  });
+
   const exportToCsv = () => {
     const headers = [
       'Target',
@@ -53,25 +81,29 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
       'Backlinks',
       'Domains',
       'Broken Backlinks',
+      'Broken Pages',
       'No Follow',
       'Text',
       'Image',
       'Canonical',
       'Redirect',
+      'Tags',
       'Info'
     ];
 
-    const csvData = data.map(item => [
+    const csvData = sortedData.map(item => [
       item.target,
       item.main_domain_rank,
       item.backlinks,
       item.referring_domains,
       item.broken_backlinks,
+      item.broken_pages,
       item.referring_domains_nofollow,
       item.anchor,
       item.image,
       item.canonical,
       item.redirect,
+      (item.tags || []).join(';'),
       Object.entries(item.referring_links_tld)
         .map(([key, value]) => `${key}:${value}`)
         .join(';')
@@ -92,6 +124,19 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
     document.body.removeChild(link);
   };
 
+  const renderSortableHeader = (field: SortField, label: string) => (
+    <th
+      scope="col"
+      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{label}</span>
+        <ArrowUpDown className="w-4 h-4" />
+      </div>
+    </th>
+  );
+
   return (
     <div className="mt-8">
       <div className="mb-4 flex justify-end">
@@ -110,21 +155,12 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Target
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                AS
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Backlinks
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Domains
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Broken Backlinks
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                No Follow
-              </th>
+              {renderSortableHeader('main_domain_rank', 'AS')}
+              {renderSortableHeader('backlinks', 'Backlinks')}
+              {renderSortableHeader('referring_domains', 'Domains')}
+              {renderSortableHeader('broken_backlinks', 'Broken Backlinks')}
+              {renderSortableHeader('broken_pages', 'Broken Pages')}
+              {renderSortableHeader('referring_domains_nofollow', 'No Follow')}
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Text
               </th>
@@ -138,12 +174,15 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
                 Redirect
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tags
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Info
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item, index) => (
+            {sortedData.map((item, index) => (
               <tr key={`${item.target}-${index}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -172,6 +211,9 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatNumber(item.broken_backlinks)}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatNumber(item.broken_pages)}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <div className="flex flex-col">
                     <span className="text-gray-900">{formatNumber(item.referring_domains_nofollow)}</span>
@@ -193,9 +235,16 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
                   {formatNumber(item.redirect)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {item.tags?.join(', ')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <InfoDropdown 
                     tldData={item.referring_links_tld}
                     referringIps={item.referring_ips}
+                    attributesData={item.referring_links_attributes}
+                    platformTypesData={item.referring_links_platform_types}
+                    semanticLocationsData={item.referring_links_semantic_locations}
+                    countriesData={item.referring_links_countries}
                   />
                 </td>
               </tr>

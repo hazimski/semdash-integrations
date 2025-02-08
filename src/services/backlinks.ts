@@ -2,7 +2,7 @@
 import { supabase } from '../config/supabase';
 import { BacklinkData } from '../types';
 
-export async function saveBacklinkResults(userId: string, results: BacklinkData[]) {
+export async function saveBacklinkResults(userId: string, results: BacklinkData[], tags?: string[]) {
   try {
     const { data, error } = await supabase
       .from('backlink_results')
@@ -10,17 +10,19 @@ export async function saveBacklinkResults(userId: string, results: BacklinkData[
         results.map(result => ({
           user_id: userId,
           target: result.target,
-          main_domain_rank: result.main_domain_rank,
+          main_domain_rank: Math.round(result.main_domain_rank / 10), // Divide AS values by 10
           backlinks: result.backlinks,
           referring_domains: result.referring_domains,
           broken_backlinks: result.broken_backlinks,
+          broken_pages: result.broken_pages,
           referring_domains_nofollow: result.referring_domains_nofollow,
           anchor: result.anchor,
           image: result.image,
           canonical: result.canonical,
           redirect: result.redirect,
           referring_links_tld: result.referring_links_tld,
-          referring_ips: result.referring_ips
+          referring_ips: result.referring_ips,
+          tags: tags || []
         }))
       );
 
