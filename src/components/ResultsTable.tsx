@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { BacklinkData } from '../types';
 import { ExternalLink, Download, ArrowUpDown } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { InfoDropdown } from './InfoDropdown';
+import { formatNumber } from '../utils/format';
 
 interface ResultsTableProps {
   data: BacklinkData[];
@@ -65,8 +65,8 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
   const sortedData = [...data].sort((a, b) => {
     if (!sortField) return 0;
     
-    const aValue = a[sortField];
-    const bValue = b[sortField];
+    const aValue = a[sortField] ?? 0;
+    const bValue = b[sortField] ?? 0;
     
     if (sortDirection === 'asc') {
       return aValue - bValue;
@@ -218,7 +218,7 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
                   <div className="flex flex-col">
                     <span className="text-gray-900">{formatNumber(item.referring_domains_nofollow)}</span>
                     <span className="text-gray-400 text-xs">
-                      {calculatePercentage(item.referring_domains_nofollow, item.referring_domains)}%
+                      {calculatePercentage(item.referring_domains_nofollow ?? 0, item.referring_domains ?? 0)}%
                     </span>
                   </div>
                 </td>
