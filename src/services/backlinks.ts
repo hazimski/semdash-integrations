@@ -22,7 +22,12 @@ export async function saveBacklinkResults(userId: string, results: BacklinkData[
           redirect: result.redirect,
           referring_links_tld: result.referring_links_tld,
           referring_ips: result.referring_ips,
-          tags: tags || []
+          tags: tags || [],
+          referring_links_types: result.referring_links_types || {},
+          referring_links_attributes: result.referring_links_attributes || {},
+          referring_links_platform_types: result.referring_links_platform_types || {},
+          referring_links_semantic_locations: result.referring_links_semantic_locations || {},
+          referring_links_countries: result.referring_links_countries || {}
         }))
       );
 
