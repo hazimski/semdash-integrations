@@ -5,10 +5,10 @@ import { ChevronDown } from 'lucide-react';
 interface InfoDropdownProps {
   tldData: Record<string, number>;
   referringIps: number;
-  attributesData?: Record<string, number>;
-  platformTypesData?: Record<string, number>;
-  semanticLocationsData?: Record<string, number>;
-  countriesData?: Record<string, number>;
+  attributesData: Record<string, number>;
+  platformTypesData: Record<string, number>;
+  semanticLocationsData: Record<string, number>;
+  countriesData: Record<string, number>;
 }
 
 export function InfoDropdown({ 
@@ -73,53 +73,45 @@ export function InfoDropdown({
               ))}
             </div>
 
-            {attributesData && (
-              <div>
-                <h4 className="font-medium mb-2">Link Attributes</h4>
-                {getTop6Entries(attributesData).map(([attr, count]) => (
-                  <div key={attr} className="flex justify-between items-center">
-                    <span className="text-gray-700">{attr}</span>
-                    <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2">Link Attributes</h4>
+              {getTop6Entries(attributesData).map(([attr, count]) => (
+                <div key={attr} className="flex justify-between items-center">
+                  <span className="text-gray-700">{attr}</span>
+                  <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
+                </div>
+              ))}
+            </div>
 
-            {platformTypesData && (
-              <div>
-                <h4 className="font-medium mb-2">Platform Types</h4>
-                {getTop6Entries(platformTypesData).map(([type, count]) => (
-                  <div key={type} className="flex justify-between items-center">
-                    <span className="text-gray-700">{type || 'Unknown'}</span>
-                    <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2">Platform Types</h4>
+              {getTop6Entries(platformTypesData).map(([type, count]) => (
+                <div key={type} className="flex justify-between items-center">
+                  <span className="text-gray-700">{type || 'Unknown'}</span>
+                  <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
+                </div>
+              ))}
+            </div>
 
-            {semanticLocationsData && (
-              <div>
-                <h4 className="font-medium mb-2">Semantic Locations</h4>
-                {getTop6Entries(semanticLocationsData).map(([loc, count]) => (
-                  <div key={loc} className="flex justify-between items-center">
-                    <span className="text-gray-700">{loc || 'Unknown'}</span>
-                    <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2">Semantic Locations</h4>
+              {getTop6Entries(semanticLocationsData).map(([loc, count]) => (
+                <div key={loc} className="flex justify-between items-center">
+                  <span className="text-gray-700">{loc || 'Unknown'}</span>
+                  <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
+                </div>
+              ))}
+            </div>
 
-            {countriesData && (
-              <div>
-                <h4 className="font-medium mb-2">Countries</h4>
-                {getTop6Entries(countriesData).map(([country, count]) => (
-                  <div key={country} className="flex justify-between items-center">
-                    <span className="text-gray-700">{country || 'Unknown'}</span>
-                    <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2">Countries</h4>
+              {getTop6Entries(countriesData).map(([country, count]) => (
+                <div key={country} className="flex justify-between items-center">
+                  <span className="text-gray-700">{country || 'Unknown'}</span>
+                  <span className="text-blue-600 font-medium">{formatNumber(count)}</span>
+                </div>
+              ))}
+            </div>
 
             <div className="pt-2 mt-2 border-t border-gray-200">
               <div className="flex justify-between items-center">

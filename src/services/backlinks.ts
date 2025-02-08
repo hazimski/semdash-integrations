@@ -10,7 +10,7 @@ export async function saveBacklinkResults(userId: string, results: BacklinkData[
         results.map(result => ({
           user_id: userId,
           target: result.target,
-          main_domain_rank: Math.round(result.main_domain_rank / 10), // Divide AS values by 10
+          main_domain_rank: Math.round(result.main_domain_rank / 10),
           backlinks: result.backlinks,
           referring_domains: result.referring_domains,
           broken_backlinks: result.broken_backlinks,
