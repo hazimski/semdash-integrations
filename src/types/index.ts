@@ -1,4 +1,3 @@
-
 export interface DomainKeyword {
   keyword: string;
   searchVolume: number;
@@ -32,15 +31,15 @@ export interface BacklinkData {
   referring_links_tld: Record<string, number>;
   referring_ips: number;
   tags?: string[];
-  referring_links_types?: {
+  referring_links_types: {
     anchor?: number;
     image?: number;
     redirect?: number;
   };
-  referring_links_attributes?: Record<string, number>;
-  referring_links_platform_types?: Record<string, number>;
-  referring_links_semantic_locations?: Record<string, number>;
-  referring_links_countries?: Record<string, number>;
+  referring_links_attributes: Record<string, number>;
+  referring_links_platform_types: Record<string, number>;
+  referring_links_semantic_locations: Record<string, number>;
+  referring_links_countries: Record<string, number>;
 }
 
 export interface DomainApiResponse {

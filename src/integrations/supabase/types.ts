@@ -75,7 +75,12 @@ export type Database = {
           referring_domains: number
           referring_domains_nofollow: number
           referring_ips: number
+          referring_links_attributes: Json
+          referring_links_countries: Json
+          referring_links_platform_types: Json
+          referring_links_semantic_locations: Json
           referring_links_tld: Json
+          referring_links_types: Json
           tags: string[] | null
           target: string
           updated_at: string
@@ -95,7 +100,12 @@ export type Database = {
           referring_domains: number
           referring_domains_nofollow: number
           referring_ips: number
+          referring_links_attributes?: Json
+          referring_links_countries?: Json
+          referring_links_platform_types?: Json
+          referring_links_semantic_locations?: Json
           referring_links_tld: Json
+          referring_links_types?: Json
           tags?: string[] | null
           target: string
           updated_at?: string
@@ -115,7 +125,12 @@ export type Database = {
           referring_domains?: number
           referring_domains_nofollow?: number
           referring_ips?: number
+          referring_links_attributes?: Json
+          referring_links_countries?: Json
+          referring_links_platform_types?: Json
+          referring_links_semantic_locations?: Json
           referring_links_tld?: Json
+          referring_links_types?: Json
           tags?: string[] | null
           target?: string
           updated_at?: string
