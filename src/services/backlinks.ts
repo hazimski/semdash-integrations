@@ -14,7 +14,7 @@ export async function saveBacklinkResults(userId: string, results: BacklinkData[
           backlinks: result.backlinks,
           referring_domains: result.referring_domains,
           broken_backlinks: result.broken_backlinks,
-          broken_pages: result.broken_pages || 0,
+          broken_pages: result.broken_pages,
           referring_domains_nofollow: result.referring_domains_nofollow,
           anchor: result.anchor,
           image: result.image,

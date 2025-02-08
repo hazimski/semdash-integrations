@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface InfoDropdownProps {
@@ -60,7 +60,11 @@ export function InfoDropdown({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute z-20 w-80 p-4 mt-2 bg-white rounded-lg shadow-lg -left-24 top-full overflow-y-auto max-h-96"
+          className="absolute z-20 w-80 p-4 mt-2 bg-white rounded-lg shadow-lg right-0 top-full overflow-y-auto max-h-96"
+          style={{ 
+            right: '0',
+            marginTop: '0.5rem'
+          }}
         >
           <div className="space-y-4">
             <div>
