@@ -34,6 +34,9 @@ export function InfoDropdown({
   }, []);
 
   function formatNumber(num: number): string {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    }
     if (num >= 1000) {
       return `${(num / 1000).toFixed(1)}K`;
     }
@@ -60,7 +63,7 @@ export function InfoDropdown({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute z-20 w-80 p-4 mt-2 bg-white rounded-lg shadow-lg right-full top-0 mr-2"
+          className="absolute z-20 w-96 p-4 mt-2 bg-white rounded-lg shadow-lg right-0 top-0"
           style={{ 
             marginTop: '-0.5rem'
           }}

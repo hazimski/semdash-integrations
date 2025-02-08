@@ -17,6 +17,7 @@ export interface BacklinkData {
   backlinks: number;
   referring_domains: number;
   broken_backlinks: number;
+  broken_pages: number;
   referring_domains_nofollow: number;
   anchor: number;
   image: number;
@@ -24,6 +25,10 @@ export interface BacklinkData {
   redirect: number;
   referring_links_tld: Record<string, number>;
   referring_ips: number;
+  referring_links_attributes: Record<string, any>;
+  referring_links_platform_types: Record<string, any>;
+  referring_links_semantic_locations: Record<string, any>;
+  referring_links_countries: Record<string, any>;
 }
 
 export interface DomainApiResponse {
@@ -99,13 +104,18 @@ export async function fetchBacklinkData(domains: string[]): Promise<BacklinkData
       backlinks: item.backlinks || 0,
       referring_domains: item.referring_domains || 0,
       broken_backlinks: item.broken_backlinks || 0,
+      broken_pages: item.broken_pages || 0,
       referring_domains_nofollow: item.referring_domains_nofollow || 0,
       anchor: item.referring_links_types?.anchor || 0,
       image: item.referring_links_types?.image || 0,
       canonical: item.referring_links_types?.canonical || 0,
       redirect: item.referring_links_types?.redirect || 0,
       referring_links_tld: item.referring_links_tld || {},
-      referring_ips: item.referring_ips || 0
+      referring_ips: item.referring_ips || 0,
+      referring_links_attributes: item.referring_links_attributes || {},
+      referring_links_platform_types: item.referring_links_platform_types || {},
+      referring_links_semantic_locations: item.referring_links_semantic_locations || {},
+      referring_links_countries: item.referring_links_countries || {}
     }));
   } catch (error) {
     if (axios.isAxiosError(error)) {
