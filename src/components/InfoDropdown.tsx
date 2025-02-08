@@ -60,10 +60,9 @@ export function InfoDropdown({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute z-20 w-80 p-4 mt-2 bg-white rounded-lg shadow-lg right-0 top-full overflow-y-auto max-h-96"
+          className="absolute z-20 w-80 p-4 mt-2 bg-white rounded-lg shadow-lg right-full top-0 mr-2"
           style={{ 
-            right: '0',
-            marginTop: '0.5rem'
+            marginTop: '-0.5rem'
           }}
         >
           <div className="space-y-4">
