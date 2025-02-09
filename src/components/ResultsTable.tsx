@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { BacklinkData } from '../types';
-import { ExternalLink, Download, ArrowUpDown } from 'lucide-react';
+import { ExternalLink, Download, ArrowUpDown, Trash2 } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { InfoDropdown } from './InfoDropdown';
 import { formatNumber } from '../utils/format';
+import { deleteBacklinkResult } from '../services/backlinks';
+import { toast } from 'react-hot-toast';
 
 interface ResultsTableProps {
-  data: BacklinkData[];
+  data: (BacklinkData & { id?: string })[];
   isLoading?: boolean;
   error?: string | null;
+  onDelete?: (id: string) => void;
 }
 
 type SortField = 'main_domain_rank' | 'backlinks' | 'referring_domains' | 'broken_backlinks' | 'broken_pages' | 'referring_domains_nofollow';
@@ -19,7 +22,7 @@ function calculatePercentage(part: number, total: number): number {
   return Math.round((part / total) * 100);
 }
 
-export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
+export function ResultsTable({ data, isLoading, error, onDelete }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -114,6 +117,19 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
     document.body.removeChild(link);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!id) return;
+    
+    try {
+      await deleteBacklinkResult(id);
+      toast.success('Result deleted successfully');
+      onDelete?.(id);
+    } catch (error) {
+      toast.error('Failed to delete result');
+      console.error('Delete error:', error);
+    }
+  };
+
   const renderSortableHeader = (field: SortField, label: string) => (
     <th
       scope="col"
@@ -168,6 +184,9 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Info
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
               </th>
             </tr>
           </thead>
@@ -236,6 +255,17 @@ export function ResultsTable({ data, isLoading, error }: ResultsTableProps) {
                     semanticLocationsData={item.referring_links_semantic_locations}
                     countriesData={item.referring_links_countries}
                   />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {item.id && (
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="text-red-600 hover:text-red-800 focus:outline-none"
+                      title="Delete result"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

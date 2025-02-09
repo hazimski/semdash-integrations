@@ -1,4 +1,3 @@
-
 import { supabase } from '../config/supabase';
 import { BacklinkData } from '../types';
 
@@ -57,6 +56,24 @@ export async function getBacklinkHistory(userId: string) {
     return data;
   } catch (error) {
     console.error('Error fetching history:', error);
+    throw error;
+  }
+}
+
+export async function deleteBacklinkResult(id: string) {
+  try {
+    const { error } = await supabase
+      .from('backlink_results')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting result:', error);
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error deleting result:', error);
     throw error;
   }
 }

@@ -46,7 +46,6 @@ export function BacklinkAnalysis() {
       const data = await fetchBacklinkData(domainList);
       setResults(data);
       
-      // Save results to history if user is authenticated
       if (user) {
         await saveBacklinkResults(user.id, data, tags);
         toast.success('Results saved to history');
@@ -58,6 +57,10 @@ export function BacklinkAnalysis() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setHistory(prev => prev.filter(item => item.id !== id));
   };
 
   return (
@@ -84,6 +87,7 @@ export function BacklinkAnalysis() {
                 data={history}
                 isLoading={false}
                 error={null}
+                onDelete={handleDelete}
               />
             )}
           </div>
