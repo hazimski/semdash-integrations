@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
@@ -31,9 +32,7 @@ export function BotoxFilters({
   const [showPageTitles, setShowPageTitles] = useState(false);
   const [showUrlFrom, setShowUrlFrom] = useState(false);
   const [showUrlTo, setShowUrlTo] = useState(false);
-  const [showUrlPattern, setShowUrlPattern] = useState(false);
   const [showItemType, setShowItemType] = useState(false);
-  const [showMode, setShowMode] = useState(false);
   const MAX_INPUTS = 4;
 
   // Get active filters for display
@@ -76,6 +75,16 @@ export function BotoxFilters({
     return active;
   };
 
+  const filterTypes = [
+    { label: 'All', value: 'all' },
+    { label: 'New', value: 'new' },
+    { label: 'Broken', value: 'broken' },
+    { label: 'Live', value: 'live' },
+    { label: 'Lost', value: 'lost' },
+    { label: 'Dofollow', value: 'dofollow' },
+    { label: 'Nofollow', value: 'nofollow' }
+  ];
+
   return (
     <div className="bg-white p-6 rounded-lg shadow space-y-6">
       {/* Active Filters */}
@@ -89,7 +98,6 @@ export function BotoxFilters({
               <span>{filter}</span>
               <button
                 onClick={() => {
-                  // Clear the specific filter
                   const [type] = filter.toLowerCase().split(':');
                   const newFilters = { ...filters };
                   switch(type) {
@@ -121,18 +129,18 @@ export function BotoxFilters({
       )}
 
       {/* Filter Type Buttons */}
-      <div className="flex flex-wrap gap-2">
-        {['all', 'new', 'broken', 'live', 'lost', 'dofollow', 'nofollow'].map(type => (
+      <div className="inline-flex rounded-lg border border-gray-200 divide-x divide-gray-200">
+        {filterTypes.map(type => (
           <button
-            key={type}
-            onClick={() => onChange({ ...filters, type })}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filters.type === type
-                ? 'bg-[#4193f0] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            key={type.value}
+            onClick={() => onChange({ ...filters, type: type.value })}
+            className={`px-4 py-2 text-sm font-medium ${
+              filters.type === type.value
+                ? 'bg-blue-50 text-blue-600'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            } first:rounded-l-lg last:rounded-r-lg transition-colors duration-200`}
           >
-            {type.charAt(0).toUpperCase() + type.slice(1)}
+            {type.label}
           </button>
         ))}
       </div>
@@ -217,7 +225,7 @@ export function BotoxFilters({
                 )}
                 <button
                   onClick={() => setShowPageTitles(false)}
-                  className="w-full py-2 text-white rounded-lg bg-[#4193f0] hover:bg-[#357ac9]"
+                  className="w-full py-2 text-white rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   Apply
                 </button>
@@ -305,7 +313,7 @@ export function BotoxFilters({
                 )}
                 <button
                   onClick={() => setShowUrlFrom(false)}
-                  className="w-full py-2 text-white rounded-lg bg-[#4193f0] hover:bg-[#357ac9]"
+                  className="w-full py-2 text-white rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   Apply
                 </button>
@@ -393,7 +401,7 @@ export function BotoxFilters({
                 )}
                 <button
                   onClick={() => setShowUrlTo(false)}
-                  className="w-full py-2 text-white rounded-lg bg-[#4193f0] hover:bg-[#357ac9]"
+                  className="w-full py-2 text-white rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   Apply
                 </button>
@@ -429,7 +437,7 @@ export function BotoxFilters({
                 </select>
                 <button
                   onClick={() => setShowItemType(false)}
-                  className="w-full py-2 mt-2 text-white rounded-lg bg-[#4193f0] hover:bg-[#357ac9]"
+                  className="w-full py-2 mt-2 text-white rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   Apply
                 </button>
@@ -448,7 +456,7 @@ export function BotoxFilters({
             onClick={() => onModeChange(modeType as typeof mode)}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${
               mode === modeType
-                ? 'bg-[#4193f0] text-white'
+                ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -466,7 +474,7 @@ export function BotoxFilters({
         </button>
         <button
           onClick={onApply}
-          className="px-4 py-2 bg-[#4193f0] text-white text-sm font-medium rounded-lg hover:bg-[#357ac9] focus:outline-none"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none"
         >
           Apply Filters
         </button>
@@ -474,3 +482,4 @@ export function BotoxFilters({
     </div>
   );
 }
+
