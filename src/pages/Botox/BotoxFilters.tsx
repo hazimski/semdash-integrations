@@ -85,9 +85,15 @@ export function BotoxFilters({
     { label: 'Nofollow', value: 'nofollow' }
   ];
 
+  const modeTypes = [
+    { label: 'As is', value: 'as_is' },
+    { label: 'One per domain', value: 'one_per_domain' },
+    { label: 'One per anchor', value: 'one_per_anchor' }
+  ];
+
   return (
     <div className="bg-white p-6 rounded-lg shadow space-y-6">
-      {/* Active Filters */}
+      {/* Active Filters Display */}
       {getActiveFilters().length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           {getActiveFilters().map((filter, index) => (
@@ -128,21 +134,39 @@ export function BotoxFilters({
         </div>
       )}
 
-      {/* Filter Type Buttons */}
-      <div className="inline-flex rounded-lg border border-gray-200 divide-x divide-gray-200">
-        {filterTypes.map(type => (
-          <button
-            key={type.value}
-            onClick={() => onChange({ ...filters, type: type.value })}
-            className={`px-4 py-2 text-sm font-medium ${
-              filters.type === type.value
-                ? 'bg-blue-50 text-blue-600'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            } first:rounded-l-lg last:rounded-r-lg transition-colors duration-200`}
-          >
-            {type.label}
-          </button>
-        ))}
+      {/* Filter Type and Mode Buttons */}
+      <div className="flex items-center gap-4">
+        <div className="inline-flex rounded-lg border border-gray-200 divide-x divide-gray-200">
+          {filterTypes.map(type => (
+            <button
+              key={type.value}
+              onClick={() => onChange({ ...filters, type: type.value })}
+              className={`px-4 py-2 text-sm font-medium ${
+                filters.type === type.value
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              } first:rounded-l-lg last:rounded-r-lg transition-colors duration-200`}
+            >
+              {type.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="inline-flex rounded-lg border border-gray-200 divide-x divide-gray-200">
+          {modeTypes.map(modeType => (
+            <button
+              key={modeType.value}
+              onClick={() => onModeChange(modeType.value as typeof mode)}
+              className={`px-4 py-2 text-sm font-medium ${
+                mode === modeType.value
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              } first:rounded-l-lg last:rounded-r-lg transition-colors duration-200`}
+            >
+              {modeType.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -482,4 +506,3 @@ export function BotoxFilters({
     </div>
   );
 }
-
